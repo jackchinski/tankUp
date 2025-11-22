@@ -26,6 +26,21 @@ const config: HardhatUserConfig = {
       url: process.env.ARBITRUM_SEPOLIA_RPC_URL || "",
       accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
     },
+    arbitrum: {
+      url: process.env.ARBITRUM_RPC_URL || "",
+      chainId: 42161,
+      accounts: process.env.DEPLOY_PRIVATE_KEY ? [process.env.DEPLOY_PRIVATE_KEY] : [],
+    },
+    optimism: {
+      url: process.env.OPTIMISM_RPC_URL || "",
+      chainId: 10,
+      accounts: process.env.DEPLOY_PRIVATE_KEY ? [process.env.DEPLOY_PRIVATE_KEY] : [],
+    },
+    worldchain: {
+      url: process.env.WORLDCHAIN_RPC_URL || "",
+      chainId: 480,
+      accounts: process.env.DEPLOY_PRIVATE_KEY ? [process.env.DEPLOY_PRIVATE_KEY] : [],
+    },
     base: {
       url: process.env.BASE_RPC_URL || "",
       chainId: 8453,
@@ -58,6 +73,23 @@ const config: HardhatUserConfig = {
         urls: {
           apiURL: "https://api-sepolia.basescan.org/api",
           browserURL: "https://sepolia.basescan.org",
+        },
+      },
+      {
+        network: "optimism",
+        chainId: 10,
+        urls: {
+          apiURL: "https://api-optimistic.etherscan.io/api",
+          browserURL: "https://optimistic.etherscan.io",
+        },
+      },
+      {
+        network: "worldchain",
+        chainId: 480,
+        urls: {
+          // Provide explorer endpoints via env for flexibility; many Worldchain explorers are Blockscout-based
+          apiURL: process.env.WORLDCHAIN_EXPLORER_API || "",
+          browserURL: process.env.WORLDCHAIN_EXPLORER_BROWSER || "",
         },
       },
     ],
