@@ -1,0 +1,38 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# Env / secrets
+.env
+.env.*
+**/.env
+**/.env.*
+
+# Node
+node_modules/
+**/node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+package-lock.json*
+yarn.lock*
+
+# Build outputs
+dist/
+build/
+coverage/
+*.tsbuildinfo
+**/*.tsbuildinfo
+
+# Hardhat
+contracts/artifacts/
+contracts/cache/
+contracts/typechain-types/
+contracts/.openzeppelin/
+
+# Editor
+.vscode/
+.idea/
+*.swp
+
