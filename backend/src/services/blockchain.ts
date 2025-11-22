@@ -108,7 +108,7 @@ export class BlockchainService {
       // Call the drip function
       // Convert usdcAmount string to BigInt for the contract call
       const usdcAmountBigInt = BigInt(usdcAmount);
-      
+
       const tx = await contract.drip(usdcAmountBigInt, recipient, {
         // Gas limit will be estimated automatically, but we can set a max
         maxFeePerGas: ethers.parseUnits("100", "gwei"), // Adjust based on chain
