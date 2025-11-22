@@ -1,11 +1,14 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import { useGasFountain } from "../context/GasFountainContext";
 import { useRecentActivity } from "../hooks/useRecentActivity";
 import { Clock, CheckCircle, XCircle, Loader2 } from "lucide-react";
 import { HistoryItem, HistoryEntry } from "../types";
+import IntentDetailModal from "./IntentDetailModal";
 
 const ActivityLog: React.FC = () => {
   const { address, isConnected } = useGasFountain();
+  const [selectedIntentId, setSelectedIntentId] = useState<string | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   // Fetch history from backend when wallet is connected
   const {
@@ -32,7 +35,7 @@ const ActivityLog: React.FC = () => {
   }, [address, isConnected, historyEntries, isLoading, error]);
 
   // Convert backend HistoryEntry to frontend HistoryItem format
-  const history: HistoryItem[] = useMemo(() => {
+  const history: (HistoryItem & { intentId: string })[] = useMemo(() => {
     if (!historyEntries || historyEntries.length === 0) return [];
 
     return historyEntries.map((entry: HistoryEntry) => {
@@ -56,9 +59,20 @@ const ActivityLog: React.FC = () => {
         amount: parseFloat(entry.amountInUsd),
         chains: entry.numChains,
         status,
+        intentId: entry.id, // Store the intent ID for opening the modal
       };
     });
   }, [historyEntries]);
+
+  const handleIntentClick = (intentId: string) => {
+    setSelectedIntentId(intentId);
+    setIsModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setSelectedIntentId(null);
+  };
 
   const getStatusIcon = (status: HistoryItem["status"]): React.ReactElement => {
     switch (status) {
@@ -99,6 +113,7 @@ const ActivityLog: React.FC = () => {
             {history.map((item) => (
               <div
                 key={item.id}
+                onClick={() => handleIntentClick(item.intentId)}
                 className="p-4 flex items-center justify-between hover:bg-muted/50 transition-colors cursor-pointer"
               >
                 <div className="flex items-center gap-4">
@@ -132,6 +147,15 @@ const ActivityLog: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Intent Detail Modal */}
+      {selectedIntentId && (
+        <IntentDetailModal
+          intentId={selectedIntentId}
+          isOpen={isModalOpen}
+          onClose={handleCloseModal}
+        />
+      )}
     </div>
   );
 };

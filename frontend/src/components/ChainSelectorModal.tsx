@@ -20,11 +20,23 @@ const ChainSelectorModal: React.FC<ChainSelectorModalProps> = ({
 }) => {
   const [searchTerm, setSearchTerm] = useState<string>("");
 
-  const filteredChains = chains.filter(
-    (chain) =>
-      chain.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      chain.symbol.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredChains = chains
+    .filter(
+      (chain) =>
+        chain.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        chain.symbol.toLowerCase().includes(searchTerm.toLowerCase())
+    )
+    .sort((a, b) => {
+      const aIsAvailable = SOURCE_CHAINS.some((sc) => sc.id === a.id);
+      const bIsAvailable = SOURCE_CHAINS.some((sc) => sc.id === b.id);
+      
+      // Available chains first
+      if (aIsAvailable && !bIsAvailable) return -1;
+      if (!aIsAvailable && bIsAvailable) return 1;
+      
+      // Then sort alphabetically
+      return a.name.localeCompare(b.name);
+    });
 
   if (!isOpen) return null;
 

@@ -90,15 +90,23 @@ const Step1Destinations: React.FC = () => {
     setDepositAmount(totalCost);
   }, [totalCost, setDepositAmount]);
 
-  // Show all chains, but mark which are available
+  // Show all chains, but mark which are available and sort available ones first
   const allFilteredChains = chains.filter((chain) =>
     chain.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const filteredChains = allFilteredChains.map((chain) => ({
-    ...chain,
-    isAvailable: DESTINATION_CHAINS.some((dc) => dc.id === chain.id),
-  }));
+  const filteredChains = allFilteredChains
+    .map((chain) => ({
+      ...chain,
+      isAvailable: DESTINATION_CHAINS.some((dc) => dc.id === chain.id),
+    }))
+    .sort((a, b) => {
+      // Available chains first
+      if (a.isAvailable && !b.isAvailable) return -1;
+      if (!a.isAvailable && b.isAvailable) return 1;
+      // Then sort alphabetically
+      return a.name.localeCompare(b.name);
+    });
 
   const isInsufficient = depositAmount < totalCost;
   const isBalanceInsufficient =
