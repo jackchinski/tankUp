@@ -3,13 +3,22 @@ import { ethers, run, network } from "hardhat";
 async function main() {
   // Base mainnet addresses
   const USDC = "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913";
-  const SWAP_ROUTER = "0x2626664c2603336e57b271c5c0b26f421741e481";
+  // Uniswap V3 SwapRouter (canonical) — same address on many chains, incl. Base
+  // Allow override via env SWAP_ROUTER if you want a custom router
+  const SWAP_ROUTER = "0x2626664c2603336E57B271c5C0b26F421741e481";
   const WETH = "0x4200000000000000000000000000000000000006";
-  const POOL_FEE = 500; // 0.05%
+  // Prefer 3000 (0.3%) on Base; allow override via env
+  const POOL_FEE = Number(process.env.UNI_POOL_FEE ?? "3000");
 
   const [deployer] = await ethers.getSigners();
   console.log("Deploying with:", deployer.address);
   console.log("Deployer balance:", (await deployer.provider!.getBalance(deployer.address)).toString());
+
+  // Sanity: router must have code on this network
+  const routerCode = await ethers.provider.getCode(SWAP_ROUTER);
+  if (routerCode === "0x") {
+    throw new Error(`SwapRouter address has no code on ${(await ethers.provider.getNetwork()).name}: ${SWAP_ROUTER}`);
+  }
 
   const Factory = await ethers.getContractFactory("GasStation");
   const contract = await Factory.deploy(USDC, SWAP_ROUTER, WETH, POOL_FEE);

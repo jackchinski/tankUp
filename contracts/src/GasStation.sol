@@ -13,7 +13,6 @@ interface ISwapRouter {
         address tokenOut;
         uint24 fee;
         address recipient;
-        uint256 deadline;
         uint256 amountIn;
         uint256 amountOutMinimum;
         uint160 sqrtPriceLimitX96;
@@ -99,7 +98,6 @@ contract GasStation is Ownable, ReentrancyGuard {
             tokenOut: address(weth),
             fee: poolFee,
             recipient: address(this),
-            deadline: block.timestamp + 300, // 5 min deadline
             amountIn: usdcAmount,
             amountOutMinimum: 0, // MVP: no slippage check
             sqrtPriceLimitX96: 0 // no price limit
