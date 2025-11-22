@@ -1,8 +1,5 @@
 import React from "react";
-import {
-  GasFountainProvider,
-  useGasFountain,
-} from "./context/GasFountainContext";
+import { GasFountainProvider, useGasFountain, ThemeProvider } from "./context";
 import Layout from "./components/Layout";
 import Header from "./components/Header";
 import ActivityLog from "./components/ActivityLog";
@@ -23,7 +20,18 @@ import {
 } from "wagmi/chains";
 
 export const wagmiConfig = createConfig({
-  chains: [mainnet, sepolia],
+  chains: [
+    mainnet,
+    sepolia,
+    base,
+    arbitrum,
+    optimism,
+    polygon,
+    bsc,
+    avalanche,
+    scroll,
+    zora,
+  ],
   transports: {
     [mainnet.id]: http(),
     [sepolia.id]: http(),
@@ -54,14 +62,16 @@ const MainContent: React.FC = () => {
 
 const App: React.FC = () => {
   return (
-    <WagmiProvider config={wagmiConfig}>
-      <GasFountainProvider>
-        <Layout>
-          <Header />
-          <MainContent />
-        </Layout>
-      </GasFountainProvider>
-    </WagmiProvider>
+    <ThemeProvider>
+      <WagmiProvider config={wagmiConfig}>
+        <GasFountainProvider>
+          <Layout>
+            <Header />
+            <MainContent />
+          </Layout>
+        </GasFountainProvider>
+      </WagmiProvider>
+    </ThemeProvider>
   );
 };
 
