@@ -11,12 +11,14 @@
         "prisma:generate": "prisma generate",
         "prisma:migrate": "prisma migrate dev",
         "prisma:migrate:deploy": "prisma migrate deploy",
-        "prisma:studio": "prisma studio"
+        "prisma:studio": "prisma studio",
+        "insert-dummy-intents": "tsx scripts/insert-dummy-intents.ts"
     },
     "keywords": [],
     "author": "",
     "license": "MIT",
     "dependencies": {
+        "@fastify/cors": "^8.5.0",
         "@prisma/client": "5.22.0",
         "ethers": "^6.9.0",
         "fastify": "^4.24.3",

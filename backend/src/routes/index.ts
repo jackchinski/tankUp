@@ -138,6 +138,7 @@ export function registerRoutes(
             status: chain.status,
           })),
         }));
+        console.log(items);
 
         const response: GetHistoryResponse = {
           items,

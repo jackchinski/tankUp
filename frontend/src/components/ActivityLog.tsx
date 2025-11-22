@@ -8,12 +8,28 @@ const ActivityLog: React.FC = () => {
   const { address, isConnected } = useGasFountain();
 
   // Fetch history from backend when wallet is connected
-  const { data: historyEntries, isLoading } = useRecentActivity({
+  const {
+    data: historyEntries,
+    isLoading,
+    error,
+  } = useRecentActivity({
     address: address,
     limit: 20,
     enabled: isConnected && !!address,
     refetchInterval: 10000, // Poll every 10 seconds
   });
+
+  // Debug logging
+  React.useEffect(() => {
+    console.log("ActivityLog Debug:", {
+      address,
+      isConnected,
+      historyEntriesCount: historyEntries?.length || 0,
+      historyEntries,
+      isLoading,
+      error: error?.message,
+    });
+  }, [address, isConnected, historyEntries, isLoading, error]);
 
   // Convert backend HistoryEntry to frontend HistoryItem format
   const history: HistoryItem[] = useMemo(() => {

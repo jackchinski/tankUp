@@ -1,4 +1,5 @@
 import Fastify from "fastify";
+import cors from "@fastify/cors";
 import { PrismaIntentStore } from "./store/prisma";
 import { DispersalService } from "./services/dispersal";
 import { registerRoutes } from "./routes";
@@ -10,7 +11,7 @@ const HOST = process.env.HOST || "0.0.0.0";
 async function main() {
   // Initialize Prisma client
   console.log("🔌 Connecting to database with Prisma...");
-  
+
   // Set DATABASE_URL if not provided (for compatibility with existing env vars)
   if (!process.env.DATABASE_URL) {
     const dbHost = process.env.DB_HOST || "localhost";
@@ -18,7 +19,7 @@ async function main() {
     const dbUser = process.env.DB_USER || "gasfountain";
     const dbPassword = process.env.DB_PASSWORD || "gasfountain123";
     const dbName = process.env.DB_NAME || "gasfountain";
-    
+
     process.env.DATABASE_URL = `postgresql://${dbUser}:${dbPassword}@${dbHost}:${dbPort}/${dbName}?schema=public`;
   }
 
@@ -35,6 +36,14 @@ async function main() {
   // Initialize Fastify
   const fastify = Fastify({
     logger: true,
+  });
+
+  // Register CORS plugin
+  await fastify.register(cors, {
+    origin: true, // Allow all origins in development (change to specific origins in production)
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "X-Indexer-Secret"],
   });
 
   // Initialize store and services with Prisma

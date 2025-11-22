@@ -44,7 +44,15 @@ export function useRecentActivity({
   const [nextCursor, setNextCursor] = useState<string | undefined>(undefined);
 
   const fetchData = useCallback(async () => {
+    console.log("useRecentActivity fetchData called:", {
+      enabled,
+      address,
+      status,
+      limit,
+    });
+
     if (!enabled || !address) {
+      console.log("Skipping fetch - not enabled or no address");
       setData([]); // Default to empty array
       setIsLoading(false);
       setError(null);
@@ -55,17 +63,24 @@ export function useRecentActivity({
     setError(null);
 
     try {
+      console.log("Fetching history for address:", address);
       const response = await fetchHistory({
         userAddress: address,
         status,
         limit,
       });
 
+      console.log("History response received:", {
+        itemsCount: response.items?.length || 0,
+        items: response.items,
+        nextCursor: response.nextCursor,
+      });
+
       setData(response.items || []);
       setNextCursor(response.nextCursor);
       setError(null); // Clear any previous errors
     } catch (err) {
-      console.warn("Failed to fetch activity history:", err);
+      console.error("Failed to fetch activity history:", err);
       // Default to empty array on error instead of null
       setData([]);
       setNextCursor(undefined);
