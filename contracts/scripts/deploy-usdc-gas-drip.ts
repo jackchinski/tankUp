@@ -47,3 +47,5 @@ main().catch((error) => {
   console.error(error);
   process.exitCode = 1;
 });
+
+// pnpm hardhat run scripts/deploy-usdc-gas-drip.ts --network base
