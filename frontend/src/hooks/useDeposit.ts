@@ -8,6 +8,7 @@ import { parseUnits, maxUint256 } from "viem";
 import {
   GAS_FOUNDATION_ABI,
   GAS_FOUNDATION_CONTRACT_ADDRESS,
+  getContractAddress,
   USDC_DECIMALS,
 } from "../contracts/gasFountain";
 import { ERC20_ABI } from "../contracts/erc20";
@@ -20,6 +21,7 @@ interface UseDepositOptions {
   totalAmountUsd: number; // Total amount in USD
   selectedChains: ChainData[];
   transactionCounts: Record<string, number>;
+  sourceChain: ChainData | null; // Source chain to determine contract address
 }
 
 interface UseDepositReturn {
@@ -34,6 +36,7 @@ interface UseDepositReturn {
   txHash: `0x${string}` | undefined;
   approvalTxHash: `0x${string}` | undefined;
   needsApproval: boolean;
+  isApprovalSuccess: boolean;
 }
 
 /**
@@ -44,9 +47,20 @@ export function useDeposit({
   totalAmountUsd,
   selectedChains,
   transactionCounts,
+  sourceChain,
 }: UseDepositOptions): UseDepositReturn {
   const { address } = useAccount();
   const [error, setError] = useState<Error | null>(null);
+
+  // Get contract address based on source chain
+  const contractAddress = sourceChain
+    ? getContractAddress(sourceChain.id) || GAS_FOUNDATION_CONTRACT_ADDRESS
+    : GAS_FOUNDATION_CONTRACT_ADDRESS;
+
+  // Get USDC address on source chain
+  const usdcAddress = sourceChain
+    ? (getTokenAddress(sourceChain.id, "USDC") as `0x${string}` | null)
+    : (getTokenAddress("base", "USDC") as `0x${string}` | null);
 
   // Prepare chain IDs and amounts
   const chainIds = selectedChains
@@ -63,22 +77,16 @@ export function useDeposit({
   // Convert total amount to USDC
   const totalAmount = parseUnits(totalAmountUsd.toFixed(6), USDC_DECIMALS);
 
-  // Get USDC address on Base
-  const usdcAddress = getTokenAddress("base", "USDC") as `0x${string}`;
-
   // Check current allowance
-  const { data: allowance } = useReadContract({
-    address: usdcAddress,
+  const { data: allowance, refetch: refetchAllowance } = useReadContract({
+    address: usdcAddress || undefined,
     abi: ERC20_ABI,
     functionName: "allowance",
-    args: address ? [address, GAS_FOUNDATION_CONTRACT_ADDRESS] : undefined,
+    args: address && usdcAddress ? [address, contractAddress] : undefined,
     query: {
       enabled: !!address && !!usdcAddress,
     },
   });
-
-  const needsApproval =
-    !!address && !!allowance && allowance < totalAmount && totalAmount > 0n;
 
   // Approval transaction
   const {
@@ -92,6 +100,37 @@ export function useDeposit({
     useWaitForTransactionReceipt({
       hash: approvalHash,
     });
+
+  // Check if approval is needed
+  // Approval is needed if allowance is less than totalAmount
+  // If allowance is sufficient, we don't need approval regardless of isApprovalSuccess
+  const needsApproval =
+    !!address &&
+    !!usdcAddress &&
+    !!contractAddress &&
+    totalAmount > 0n &&
+    (allowance === undefined || allowance < totalAmount);
+
+  // Debug logging
+  useEffect(() => {
+    if (address && usdcAddress && contractAddress) {
+      console.log("Approval check:", {
+        needsApproval,
+        allowance: allowance?.toString(),
+        totalAmount: totalAmount.toString(),
+        hasAddress: !!address,
+        hasUsdcAddress: !!usdcAddress,
+        hasContractAddress: !!contractAddress,
+      });
+    }
+  }, [
+    needsApproval,
+    allowance,
+    totalAmount,
+    address,
+    usdcAddress,
+    contractAddress,
+  ]);
 
   // Deposit transaction
   const {
@@ -110,59 +149,59 @@ export function useDeposit({
     hash,
   });
 
-  // Auto-deposit after approval succeeds
+  // Refetch allowance after approval succeeds to verify it was updated
   useEffect(() => {
-    if (isApprovalSuccess && needsApproval && !hash && chainIds.length > 0) {
-      // Small delay to ensure approval is processed on-chain
-      const timer = setTimeout(() => {
-        if (chainIds.length === chainAmounts.length) {
-          try {
-            writeDeposit({
-              address: GAS_FOUNDATION_CONTRACT_ADDRESS,
-              abi: GAS_FOUNDATION_ABI,
-              functionName: "deposit",
-              args: [totalAmount, chainIds, chainAmounts],
-            });
-          } catch (err) {
-            // Error will be caught by writeError
-          }
-        }
-      }, 2000); // 2 second delay to ensure approval is confirmed
-      return () => clearTimeout(timer);
+    if (isApprovalSuccess && approvalHash) {
+      console.log("Approval confirmed, refetching allowance...");
+      // Refetch allowance after a short delay to ensure it's updated on-chain
+      setTimeout(() => {
+        refetchAllowance();
+      }, 2000);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isApprovalSuccess, needsApproval, hash]);
+  }, [isApprovalSuccess, approvalHash, refetchAllowance]);
 
   const approve = () => {
     setError(null);
 
     if (!usdcAddress) {
-      setError(new Error("USDC address not found"));
+      const err = new Error("USDC address not found");
+      setError(err);
+      console.error("Approval error:", err);
       return;
     }
+
+    if (!contractAddress) {
+      const err = new Error("Contract address not found");
+      setError(err);
+      console.error("Approval error:", err);
+      return;
+    }
+
+    console.log("=== APPROVING USDC ===");
+    console.log("USDC Address:", usdcAddress);
+    console.log("Contract Address:", contractAddress);
+    console.log("Amount to approve: MAX (maxUint256)");
+    console.log("Current allowance:", allowance?.toString() || "unknown");
+    console.log("Required amount:", totalAmount.toString());
+    console.log("====================");
 
     try {
       writeApprove({
         address: usdcAddress,
         abi: ERC20_ABI,
         functionName: "approve",
-        args: [GAS_FOUNDATION_CONTRACT_ADDRESS, maxUint256], // Approve max for convenience
+        args: [contractAddress, maxUint256], // Approve max for convenience
       });
+      console.log("✓ Approval transaction sent");
     } catch (err) {
-      setError(err instanceof Error ? err : new Error("Unknown error"));
+      const error = err instanceof Error ? err : new Error("Unknown error");
+      setError(error);
+      console.error("Approval error:", error);
     }
   };
 
   const deposit = () => {
     setError(null);
-
-    console.log("Deposit function called", {
-      chainIds,
-      chainAmounts,
-      totalAmount: totalAmount.toString(),
-      needsApproval,
-      isApprovalSuccess,
-    });
 
     if (chainIds.length === 0) {
       const err = new Error("No destination chains selected");
@@ -178,32 +217,110 @@ export function useDeposit({
       return;
     }
 
-    // Check if approval is still needed
-    if (needsApproval && !isApprovalSuccess) {
-      const err = new Error("Please approve USDC spending first");
+    // CRITICAL: Always check if approval is needed before depositing
+    if (needsApproval) {
+      if (!isApprovalSuccess) {
+        const err = new Error(
+          "USDC approval required. Please approve USDC spending first."
+        );
+        setError(err);
+        console.error("Deposit error:", err);
+        console.log("Current allowance:", allowance?.toString() || "unknown");
+        console.log("Required amount:", totalAmount.toString());
+        return;
+      }
+      // If approval was successful but allowance hasn't updated yet, wait
+      if (allowance === undefined || allowance < totalAmount) {
+        const err = new Error(
+          "Waiting for approval to be confirmed. Please try again in a moment."
+        );
+        setError(err);
+        console.error("Deposit error:", err);
+        console.log("Current allowance:", allowance?.toString() || "unknown");
+        console.log("Required amount:", totalAmount.toString());
+        return;
+      }
+    }
+
+    // Calculate sum of chain amounts to verify it matches totalAmount
+    const sumOfChainAmounts = chainAmounts.reduce(
+      (sum, amount) => sum + amount,
+      0n
+    );
+
+    // Build detailed payload log
+    const payloadDetails = {
+      selectedChains: selectedChains.map((chain, index) => ({
+        name: chain.name,
+        id: chain.id,
+        numericChainId: chainIds[index]?.toString(),
+        amountUsd: (transactionCounts[chain.id] || 10) * chain.avgTxCost,
+        amountUsdc: chainAmounts[index]?.toString(),
+        transactionCount: transactionCounts[chain.id] || 10,
+      })),
+      arrays: {
+        chainIds: chainIds.map((id) => id.toString()),
+        chainAmounts: chainAmounts.map((amt) => amt.toString()),
+      },
+      totals: {
+        totalAmountUsd: totalAmountUsd,
+        totalAmountUsdc: totalAmount.toString(),
+        sumOfChainAmountsUsdc: sumOfChainAmounts.toString(),
+        amountsMatch: sumOfChainAmounts === totalAmount,
+      },
+      validation: {
+        chainIdsLength: chainIds.length,
+        chainAmountsLength: chainAmounts.length,
+        arraysMatch: chainIds.length === chainAmounts.length,
+        sumMatchesTotal: sumOfChainAmounts === totalAmount,
+      },
+    };
+
+    console.log("=== DEPOSIT PAYLOAD ===");
+    console.log("Selected Chains with Amounts:", payloadDetails.selectedChains);
+    console.log("Chain IDs Array:", payloadDetails.arrays.chainIds);
+    console.log(
+      "Chain Amounts Array (USDC):",
+      payloadDetails.arrays.chainAmounts
+    );
+    console.log("Total Amount (USDC):", payloadDetails.totals.totalAmountUsdc);
+    console.log(
+      "Sum of Chain Amounts (USDC):",
+      payloadDetails.totals.sumOfChainAmountsUsdc
+    );
+    console.log("Validation:", payloadDetails.validation);
+    console.log("======================");
+
+    // Verify sum matches total
+    if (sumOfChainAmounts !== totalAmount) {
+      const err = new Error(
+        `Amounts do not sum to totalAmount. Sum: ${sumOfChainAmounts.toString()}, Total: ${totalAmount.toString()}`
+      );
       setError(err);
-      console.error("Deposit error:", err);
+      console.error("Deposit validation error:", err);
       return;
     }
 
-    console.log("Calling writeDeposit with:", {
-      address: GAS_FOUNDATION_CONTRACT_ADDRESS,
+    // Final contract call payload
+    console.log("Contract Call Payload:", {
+      address: contractAddress,
+      sourceChain: sourceChain?.name || "Unknown",
       functionName: "deposit",
       args: [
-        totalAmount.toString(),
-        chainIds.map((id) => id.toString()),
-        chainAmounts.map((amt) => amt.toString()),
+        totalAmount.toString(), // totalAmount
+        chainIds.map((id) => id.toString()), // chainIds
+        chainAmounts.map((amt) => amt.toString()), // chainAmounts
       ],
     });
 
     try {
       writeDeposit({
-        address: GAS_FOUNDATION_CONTRACT_ADDRESS,
+        address: contractAddress,
         abi: GAS_FOUNDATION_ABI,
         functionName: "deposit",
         args: [totalAmount, chainIds, chainAmounts],
       });
-      console.log("writeDeposit called successfully");
+      console.log("✓ writeDeposit called successfully");
     } catch (err) {
       const error = err instanceof Error ? err : new Error("Unknown error");
       setError(error);
@@ -231,5 +348,6 @@ export function useDeposit({
     txHash: hash,
     approvalTxHash: approvalHash,
     needsApproval: needsApproval ?? false,
+    isApprovalSuccess: isApprovalSuccess ?? false,
   };
 }

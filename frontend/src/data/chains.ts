@@ -3,7 +3,6 @@ import {
   arbitrum,
   base,
   optimism,
-  polygon,
   bsc,
   avalanche,
   scroll,
@@ -18,7 +17,6 @@ const chainIdMap: Record<string, Chain> = {
   arb: arbitrum,
   base: base,
   op: optimism,
-  poly: polygon,
   bsc: bsc,
   avax: avalanche,
   scroll: scroll,
@@ -64,15 +62,6 @@ const allChains: ChainData[] = [
     viemChain: optimism,
   },
   {
-    id: "poly",
-    name: "Polygon",
-    symbol: "MATIC",
-    logo: "https://cryptologos.cc/logos/polygon-matic-logo.svg?v=026",
-    avgTxCost: 0.02,
-    nativePrice: 0.8,
-    viemChain: polygon,
-  },
-  {
     id: "bsc",
     name: "BNB Chain",
     symbol: "BNB",
@@ -108,13 +97,25 @@ const allChains: ChainData[] = [
     nativePrice: 3000,
     viemChain: zora,
   },
+  {
+    id: "world",
+    name: "World",
+    symbol: "WLD",
+    logo: "https://cryptologos.cc/logos/worldcoin-wld-logo.svg?v=026",
+    avgTxCost: 0.05,
+    nativePrice: 5.0,
+    viemChain: base, // TODO: Replace with actual World chain when available
+  },
 ];
 
-// For demo: Only Base as source, Base/Arbitrum/Optimism/Polygon as destinations
-export const SOURCE_CHAINS = allChains.filter((chain) => chain.id === "base");
-export const DESTINATION_CHAINS = allChains.filter((chain) =>
-  ["base", "arb", "op", "poly"].includes(chain.id)
-);
+// Source and destination chains: OP, World, Base, Arbitrum (in this order)
+const supportedChainIds = ["op", "world", "base", "arb"] as const;
+export const SOURCE_CHAINS = supportedChainIds
+  .map((id) => allChains.find((chain) => chain.id === id))
+  .filter((chain): chain is ChainData => chain !== undefined);
+export const DESTINATION_CHAINS = supportedChainIds
+  .map((id) => allChains.find((chain) => chain.id === id))
+  .filter((chain): chain is ChainData => chain !== undefined);
 
 // Export all chains for backward compatibility
 export const chains = allChains;
@@ -135,6 +136,28 @@ export const getChainIdFromNumeric = (
 export const getNumericChainId = (chainId: string): number | undefined => {
   const chain = chains.find((c) => c.id === chainId);
   return chain?.viemChain.id;
+};
+
+// Get explorer URL for a chain
+export const getExplorerUrl = (chainId: string): string => {
+  const chain = chains.find((c) => c.id === chainId);
+  if (!chain) return "https://basescan.org";
+
+  // Use blockExplorer from viem chain if available
+  const explorer = chain.viemChain.blockExplorers?.default;
+  if (explorer?.url) {
+    return explorer.url;
+  }
+
+  // Fallback to known explorers
+  const explorerMap: Record<string, string> = {
+    base: "https://basescan.org",
+    arb: "https://arbiscan.io",
+    op: "https://optimistic.etherscan.io",
+    eth: "https://etherscan.io",
+  };
+
+  return explorerMap[chainId] || "https://basescan.org";
 };
 
 export { chainIdMap };

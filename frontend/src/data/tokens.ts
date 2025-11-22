@@ -31,13 +31,6 @@ const TOKEN_ADDRESSES: Record<string, Record<string, string | null>> = {
     USDT: "0x94b008aA00579c1307B0EF2c499aD98a8ce58e58",
     WETH: "0x4200000000000000000000000000000000000006",
   },
-  // Polygon
-  poly: {
-    MATIC: null,
-    USDC: "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359",
-    USDT: "0xc2132D05D31c914a87C6611C10748AEb04B58e8F",
-    WETH: "0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619",
-  },
   // BNB Chain
   bsc: {
     BNB: null,

@@ -42,9 +42,10 @@ services:
       DISTRIBUTOR_PRIVATE_KEY: ${DISTRIBUTOR_PRIVATE_KEY:-}
       # Contract addresses (set in .env file)
       CONTRACT_ADDRESS_1: ${CONTRACT_ADDRESS_1:-}
-      CONTRACT_ADDRESS_10: ${CONTRACT_ADDRESS_10:-}
-      CONTRACT_ADDRESS_42161: ${CONTRACT_ADDRESS_42161:-}
-      CONTRACT_ADDRESS_8453: ${CONTRACT_ADDRESS_8453:-}
+      CONTRACT_ADDRESS_10: ${CONTRACT_ADDRESS_10:-0xAB8F16Fa5C88e978344AeC037998Ca32Bf4e9CbD}
+      CONTRACT_ADDRESS_42161: ${CONTRACT_ADDRESS_42161:-0x541BB5476eA25f6a05Cf28F08cb4eB8cF9e8Da10}
+      CONTRACT_ADDRESS_8453: ${CONTRACT_ADDRESS_8453:-0xEfE0B3eFB879891D16145B93f21369ddE8FAaA15}
+      CONTRACT_ADDRESS_480: ${CONTRACT_ADDRESS_480:-0xCDaC32EfB5546c3cCB1bf6CD262324733B90385e}
       CONTRACT_ADDRESS_137: ${CONTRACT_ADDRESS_137:-}
       CONTRACT_ADDRESS_56: ${CONTRACT_ADDRESS_56:-}
       CONTRACT_ADDRESS_43114: ${CONTRACT_ADDRESS_43114:-}
@@ -55,7 +56,6 @@ services:
       OP_RPC_URL: ${OP_RPC_URL:-}
       ARB_RPC_URL: ${ARB_RPC_URL:-}
       BASE_RPC_URL: ${BASE_RPC_URL:-}
-      POLY_RPC_URL: ${POLY_RPC_URL:-}
       BSC_RPC_URL: ${BSC_RPC_URL:-}
       AVAX_RPC_URL: ${AVAX_RPC_URL:-}
       SCROLL_RPC_URL: ${SCROLL_RPC_URL:-}
@@ -77,7 +77,7 @@ services:
     # Use the prisma binary from node_modules to ensure correct version
     # For first run, use db push (creates schema without migrations)
     # For production, use: ./node_modules/.bin/prisma migrate deploy
-    command: sh -c "sleep 3 && ./node_modules/.bin/prisma db push --accept-data-loss && npm run dev"
+    command: sh -c "sleep 5 && ./node_modules/.bin/prisma db push --accept-data-loss --skip-generate && npm run dev"
 
 volumes:
   postgres_data:

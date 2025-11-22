@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useGasFountain } from "../context/GasFountainContext";
-import { SOURCE_CHAINS } from "../data/chains";
+import { SOURCE_CHAINS, chains } from "../data/chains";
 import {
   ChevronLeft,
   ChevronRight,
@@ -45,7 +45,11 @@ const Step2Source: React.FC = () => {
 
   // Initialize defaults
   useEffect(() => {
-    if (!sourceChain) setSourceChain(SOURCE_CHAINS[0]);
+    if (!sourceChain) {
+      // Find Base chain, or default to first available chain
+      const baseChain = SOURCE_CHAINS.find((chain) => chain.id === "base");
+      setSourceChain(baseChain || SOURCE_CHAINS[0]);
+    }
     if (!sourceToken && availableTokens.length > 0) {
       const usdc = availableTokens.find((t) => t.symbol === "USDC");
       setSourceToken(usdc || availableTokens[0]);

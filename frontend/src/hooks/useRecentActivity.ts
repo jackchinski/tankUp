@@ -11,7 +11,7 @@ interface UseRecentActivityOptions {
 }
 
 interface UseRecentActivityReturn {
-  data: HistoryEntry[] | null;
+  data: HistoryEntry[];
   isLoading: boolean;
   error: Error | null;
   refetch: () => Promise<void>;
@@ -38,14 +38,14 @@ export function useRecentActivity({
   enabled = true,
   refetchInterval = 0,
 }: UseRecentActivityOptions = {}): UseRecentActivityReturn {
-  const [data, setData] = useState<HistoryEntry[] | null>(null);
+  const [data, setData] = useState<HistoryEntry[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
   const [nextCursor, setNextCursor] = useState<string | undefined>(undefined);
 
   const fetchData = useCallback(async () => {
     if (!enabled || !address) {
-      setData(null);
+      setData([]); // Default to empty array
       setIsLoading(false);
       setError(null);
       return;
@@ -61,11 +61,15 @@ export function useRecentActivity({
         limit,
       });
 
-      setData(response.items);
+      setData(response.items || []);
       setNextCursor(response.nextCursor);
+      setError(null); // Clear any previous errors
     } catch (err) {
+      console.warn("Failed to fetch activity history:", err);
+      // Default to empty array on error instead of null
+      setData([]);
+      setNextCursor(undefined);
       setError(err instanceof Error ? err : new Error("Unknown error"));
-      setData(null);
     } finally {
       setIsLoading(false);
     }

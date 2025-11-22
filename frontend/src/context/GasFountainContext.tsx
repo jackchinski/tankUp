@@ -5,7 +5,7 @@ import React, {
   useEffect,
   useCallback,
 } from "react";
-import { chains, SOURCE_CHAINS, DESTINATION_CHAINS } from "../data/chains";
+import { SOURCE_CHAINS, DESTINATION_CHAINS } from "../data/chains";
 import { useAccount, useSwitchChain } from "wagmi";
 import { useTokenBalances } from "../hooks/useTokenBalances";
 import { getViemChain } from "../data/chains";
@@ -31,7 +31,7 @@ export const useGasFountain = (): GasFountainContextType => {
 export const GasFountainProvider: React.FC<GasFountainProviderProps> = ({
   children,
 }) => {
-  const [currentStep, setCurrentStep] = useState<number>(2);
+  const [currentStep, setCurrentStep] = useState<number>(1);
   const [selectedChains, setSelectedChains] = useState<ChainData[]>([]);
   const [transactionCounts, setTransactionCounts] = useState<
     Record<string, number>
@@ -41,29 +41,16 @@ export const GasFountainProvider: React.FC<GasFountainProviderProps> = ({
     import("../types").Token | null
   >(null);
   const [depositAmount, setDepositAmount] = useState<number>(0);
-  const [history, setHistory] = useState<HistoryItem[]>([
-    {
-      id: 1,
-      timestamp: Date.now() - 1000000,
-      amount: 15,
-      chains: 3,
-      status: "Success",
-    },
-    {
-      id: 2,
-      timestamp: Date.now() - 5000000,
-      amount: 50,
-      chains: 5,
-      status: "Success",
-    },
-  ]);
+  // History is now fetched from backend via ActivityLog component
+  // Keeping this for backward compatibility with Step2Execution
+  const [history, setHistory] = useState<HistoryItem[]>([]);
   const [depositTxHash, setDepositTxHash] = useState<string | undefined>(
     undefined
   );
 
   const { address, isConnected, chainId } = useAccount();
   const { switchChain } = useSwitchChain();
-  const sourceChainId = sourceChain?.id || "eth";
+  const sourceChainId = sourceChain?.id || "base";
   const { balances: tokenBalances, isLoading: balancesLoading } =
     useTokenBalances(sourceChainId);
 
@@ -80,7 +67,9 @@ export const GasFountainProvider: React.FC<GasFountainProviderProps> = ({
   // Initialize source chain to Base
   useEffect(() => {
     if (!sourceChain && SOURCE_CHAINS.length > 0) {
-      setSourceChainState(SOURCE_CHAINS[0]);
+      // Find Base chain, or default to first available chain
+      const baseChain = SOURCE_CHAINS.find((chain) => chain.id === "base");
+      setSourceChainState(baseChain || SOURCE_CHAINS[0]);
     }
   }, [sourceChain]);
 

@@ -51,16 +51,32 @@ export async function fetchHistory(
   const queryString = params.toString();
   const url = `${API_BASE_URL}/history${queryString ? `?${queryString}` : ""}`;
 
-  const response = await fetch(url);
+  try {
+    const response = await fetch(url);
 
-  if (!response.ok) {
-    const error = await response
-      .json()
-      .catch(() => ({ error: "Unknown error" }));
-    throw new Error(
-      error.error || `Failed to fetch history: ${response.statusText}`
-    );
+    if (!response.ok) {
+      // Try to parse error, but don't fail if it's not JSON
+      const error = await response
+        .json()
+        .catch(() => ({ error: "Unknown error" }));
+      throw new Error(
+        error.error || `Failed to fetch history: ${response.statusText}`
+      );
+    }
+
+    const data = await response.json();
+    // Ensure we always return a valid response with items array
+    return {
+      items: data.items || [],
+      nextCursor: data.nextCursor,
+    };
+  } catch (err) {
+    // Handle network errors (CORS, connection refused, etc.)
+    if (err instanceof TypeError && err.message.includes("fetch")) {
+      throw new Error(
+        "Failed to connect to server. Please check your connection."
+      );
+    }
+    throw err;
   }
-
-  return response.json();
 }

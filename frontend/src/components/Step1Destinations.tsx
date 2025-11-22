@@ -47,7 +47,11 @@ const Step1Destinations: React.FC = () => {
 
   // Initialize defaults
   useEffect(() => {
-    if (!sourceChain) setSourceChain(chains[0]);
+    if (!sourceChain) {
+      // Find Base chain, or default to first available source chain
+      const baseChain = SOURCE_CHAINS.find((chain) => chain.id === "base");
+      setSourceChain(baseChain || SOURCE_CHAINS[0]);
+    }
     if (!sourceToken && availableTokens.length > 0) {
       // Default to first token with balance, or USDC if available
       const usdc = availableTokens.find((t) => t.symbol === "USDC");
@@ -357,7 +361,11 @@ const Step1Destinations: React.FC = () => {
             >
               <div className="flex items-center gap-3">
                 <img
-                  src={sourceChain?.logo || chains[0].logo}
+                  src={
+                    sourceChain?.logo ||
+                    SOURCE_CHAINS.find((c) => c.id === "base")?.logo ||
+                    SOURCE_CHAINS[0]?.logo
+                  }
                   alt="chain"
                   className="w-10 h-10 rounded-full bg-white p-0.5 shadow-md group-hover:scale-110 transition-transform"
                 />

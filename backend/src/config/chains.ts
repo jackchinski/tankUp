@@ -27,7 +27,10 @@ export const CHAIN_CONFIGS: Record<number, ChainConfig> = {
     name: "Optimism",
     rpcUrl: process.env.OP_RPC_URL || "https://mainnet.optimism.io",
     explorerUrl: "https://optimistic.etherscan.io",
-    nativeSymbol: "OP",
+    nativeSymbol: "ETH",
+    contractAddress:
+      process.env.CONTRACT_ADDRESS_10 ||
+      "0xAB8F16Fa5C88e978344AeC037998Ca32Bf4e9CbD",
   },
   // Arbitrum
   42161: {
@@ -36,6 +39,9 @@ export const CHAIN_CONFIGS: Record<number, ChainConfig> = {
     rpcUrl: process.env.ARB_RPC_URL || "https://arb1.arbitrum.io/rpc",
     explorerUrl: "https://arbiscan.io",
     nativeSymbol: "ETH",
+    contractAddress:
+      process.env.CONTRACT_ADDRESS_42161 ||
+      "0x541BB5476eA25f6a05Cf28F08cb4eB8cF9e8Da10",
   },
   // Base
   8453: {
@@ -44,14 +50,9 @@ export const CHAIN_CONFIGS: Record<number, ChainConfig> = {
     rpcUrl: process.env.BASE_RPC_URL || "https://mainnet.base.org",
     explorerUrl: "https://basescan.org",
     nativeSymbol: "ETH",
-  },
-  // Polygon
-  137: {
-    chainId: 137,
-    name: "Polygon",
-    rpcUrl: process.env.POLY_RPC_URL || "https://polygon-rpc.com",
-    explorerUrl: "https://polygonscan.com",
-    nativeSymbol: "MATIC",
+    contractAddress:
+      process.env.CONTRACT_ADDRESS_8453 ||
+      "0xEfE0B3eFB879891D16145B93f21369ddE8FAaA15",
   },
   // BSC
   56: {
@@ -84,6 +85,19 @@ export const CHAIN_CONFIGS: Record<number, ChainConfig> = {
     rpcUrl: process.env.ZORA_RPC_URL || "https://rpc.zora.energy",
     explorerUrl: "https://explorer.zora.energy",
     nativeSymbol: "ETH",
+  },
+  // World Chain
+  480: {
+    chainId: 480,
+    name: "World Chain",
+    rpcUrl:
+      process.env.WORLD_RPC_URL ||
+      "https://worldchain-mainnet.g.alchemy.com/v2/demo",
+    explorerUrl: "https://worldscan.org",
+    nativeSymbol: "ETH",
+    contractAddress:
+      process.env.CONTRACT_ADDRESS_480 ||
+      "0xCDaC32EfB5546c3cCB1bf6CD262324733B90385e",
   },
 };
 

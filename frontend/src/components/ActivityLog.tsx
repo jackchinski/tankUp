@@ -1,10 +1,48 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { useGasFountain } from "../context/GasFountainContext";
+import { useRecentActivity } from "../hooks/useRecentActivity";
 import { Clock, CheckCircle, XCircle, Loader2 } from "lucide-react";
-import { HistoryItem } from "../types";
+import { HistoryItem, HistoryEntry } from "../types";
 
 const ActivityLog: React.FC = () => {
-  const { history } = useGasFountain();
+  const { address, isConnected } = useGasFountain();
+
+  // Fetch history from backend when wallet is connected
+  const { data: historyEntries, isLoading } = useRecentActivity({
+    address: address,
+    limit: 20,
+    enabled: isConnected && !!address,
+    refetchInterval: 10000, // Poll every 10 seconds
+  });
+
+  // Convert backend HistoryEntry to frontend HistoryItem format
+  const history: HistoryItem[] = useMemo(() => {
+    if (!historyEntries || historyEntries.length === 0) return [];
+
+    return historyEntries.map((entry: HistoryEntry) => {
+      // Map backend status to frontend status
+      let status: HistoryItem["status"] = "Pending";
+      if (entry.status === "DISPERSED") {
+        status = "Success";
+      } else if (entry.status === "FAILED") {
+        status = "Failed";
+      } else if (
+        entry.status === "DISPERSE_IN_PROGRESS" ||
+        entry.status === "DISPERSE_QUEUED" ||
+        entry.status === "DEPOSIT_CONFIRMED"
+      ) {
+        status = "Pending";
+      }
+
+      return {
+        id: parseInt(entry.id.slice(2, 10), 16) || Date.now(), // Convert hex to number for id
+        timestamp: new Date(entry.createdAt).getTime(),
+        amount: parseFloat(entry.amountInUsd),
+        chains: entry.numChains,
+        status,
+      };
+    });
+  }, [historyEntries]);
 
   const getStatusIcon = (status: HistoryItem["status"]): React.ReactElement => {
     switch (status) {
@@ -27,7 +65,16 @@ const ActivityLog: React.FC = () => {
       </h3>
 
       <div className="bg-muted/30 rounded-xl border border-border overflow-hidden">
-        {history.length === 0 ? (
+        {!isConnected ? (
+          <div className="p-8 text-center text-secondary">
+            Connect your wallet to view recent activity
+          </div>
+        ) : isLoading ? (
+          <div className="p-8 text-center text-secondary">
+            <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2" />
+            Loading activity...
+          </div>
+        ) : history.length === 0 ? (
           <div className="p-8 text-center text-secondary">
             No recent activity
           </div>
