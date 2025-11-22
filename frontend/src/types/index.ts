@@ -46,6 +46,8 @@ export interface GasFountainContextType {
   chainId: number | undefined;
   tokenBalances: Token[];
   balancesLoading: boolean;
+  depositTxHash: string | undefined;
+  setDepositTxHash: (txHash: string | undefined) => void;
 }
 
 export interface HistoryItem {
@@ -58,4 +60,94 @@ export interface HistoryItem {
 
 export interface GasFountainProviderProps {
   children: React.ReactNode;
+}
+
+// Backend API types
+export type ChainDispersalStatus =
+  | "NOT_STARTED"
+  | "QUEUED"
+  | "BROADCASTED"
+  | "CONFIRMED"
+  | "FAILED";
+
+export type IntentStatus =
+  | "DEPOSIT_CONFIRMED"
+  | "DISPERSE_QUEUED"
+  | "DISPERSE_IN_PROGRESS"
+  | "DISPERSED"
+  | "FAILED";
+
+export type GlobalPhase =
+  | "DEPOSIT_CONFIRMED"
+  | "PREPARING_SWAP"
+  | "SWAPPING"
+  | "DISPERSING"
+  | "COMPLETED"
+  | "FAILED";
+
+export interface ChainDispersal {
+  chainId: number;
+  chainName?: string;
+  nativeSymbol?: string;
+  amountUsd: string;
+  estNativeAmount?: string;
+  status: ChainDispersalStatus;
+  txHash?: string;
+  explorerUrl?: string;
+  gasUsed?: string;
+  errorMessage?: string;
+  updatedAt: string;
+}
+
+export interface DepositIntent {
+  id: string;
+  userAddress: string;
+  sourceChainId: number;
+  sourceTxHash: string;
+  sourceBlockNumber?: number;
+  tokenAddress: string;
+  tokenSymbol?: string;
+  amountInTokenRaw: string;
+  amountInUsd: string;
+  status: IntentStatus;
+  globalPhase: GlobalPhase;
+  allocations: Array<{
+    chainId: number;
+    chainName?: string;
+    nativeSymbol?: string;
+    amountUsd: string;
+    estNativeAmount?: string;
+  }>;
+  chainStatuses: ChainDispersal[];
+  createdAt: string;
+  updatedAt: string;
+  completedAt?: string;
+}
+
+export interface GetStatusResponse {
+  intent: DepositIntent;
+}
+
+export interface HistoryEntry {
+  id: string;
+  userAddress: string;
+  sourceChainId: number;
+  sourceTxHash: string;
+  tokenSymbol?: string;
+  amountInUsd: string;
+  status: IntentStatus;
+  createdAt: string;
+  completedAt?: string;
+  numChains: number;
+  chains: {
+    chainId: number;
+    chainName?: string;
+    amountUsd: string;
+    status: ChainDispersalStatus;
+  }[];
+}
+
+export interface GetHistoryResponse {
+  items: HistoryEntry[];
+  nextCursor?: string;
 }

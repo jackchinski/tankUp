@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Search, X, Check } from "lucide-react";
-import { chains } from "../data/chains";
+import { chains, SOURCE_CHAINS } from "../data/chains";
 import { clsx } from "clsx";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChainData } from "../types";
@@ -78,18 +78,27 @@ const ChainSelectorModal: React.FC<ChainSelectorModalProps> = ({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {filteredChains.map((chain) => {
                 const isSelected = selectedChainId === chain.id;
+                const isAvailable = SOURCE_CHAINS.some(
+                  (sc) => sc.id === chain.id
+                );
                 return (
                   <button
                     key={chain.id}
                     onClick={() => {
-                      onSelect(chain);
-                      onClose();
+                      if (isAvailable) {
+                        onSelect(chain);
+                        onClose();
+                      }
                     }}
+                    disabled={!isAvailable}
                     className={clsx(
                       "flex items-center gap-4 p-4 rounded-2xl border text-left transition-all duration-200 group",
+                      !isAvailable && "opacity-40 cursor-not-allowed",
                       isSelected
                         ? "bg-primary/10 border-primary shadow-[0_0_15px_rgba(41,151,255,0.2)]"
-                        : "bg-white/5 border-white/5 hover:bg-white/10 hover:border-white/10 hover:scale-[1.02]"
+                        : isAvailable
+                        ? "bg-white/5 border-white/5 hover:bg-white/10 hover:border-white/10 hover:scale-[1.02]"
+                        : "bg-white/5 border-white/5"
                     )}
                   >
                     <div className="relative">
@@ -107,11 +116,16 @@ const ChainSelectorModal: React.FC<ChainSelectorModalProps> = ({
                     <div>
                       <div
                         className={clsx(
-                          "font-bold text-lg",
+                          "font-bold text-lg flex items-center gap-2",
                           isSelected ? "text-primary" : "text-white"
                         )}
                       >
                         {chain.name}
+                        {!isAvailable && (
+                          <span className="text-xs text-secondary font-normal">
+                            (Coming Soon)
+                          </span>
+                        )}
                       </div>
                       <div className="text-sm text-secondary font-medium">
                         {chain.symbol}

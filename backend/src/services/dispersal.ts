@@ -6,12 +6,18 @@ import {
   GlobalPhase,
 } from "../types";
 import { IntentStore } from "../store";
+import { BlockchainService } from "./blockchain";
+import { ethers } from "ethers";
 
 /**
  * Service for managing dispersal status transitions and business logic
  */
 export class DispersalService {
-  constructor(private store: IntentStore) {}
+  private blockchainService: BlockchainService;
+
+  constructor(private store: IntentStore) {
+    this.blockchainService = new BlockchainService();
+  }
 
   /**
    * Enqueue dispersal for all destination chains
@@ -38,17 +44,19 @@ export class DispersalService {
       chainStatuses: updatedChainStatuses,
     });
 
-    // TODO: Here we would kick off actual dispersal jobs
-    // For example:
-    // - Call a swap service to convert USDC -> native token
-    // - For each destination chain, prepare and broadcast a transaction
-    // - Use a job queue (Bull, BullMQ, etc.) to handle async processing
-    // - Set up webhook listeners or polling to track tx confirmations
-
-    // Stub: simulate starting dispersal (in real implementation, this would
-    // trigger async jobs that call updateChainDispersalStatus)
-    this.simulateDispersalStart(intentId).catch((err) => {
-      console.error(`Error simulating dispersal for ${intentId}:`, err);
+    // Start actual dispersal for each destination chain
+    this.startDispersal(intentId).catch((err) => {
+      console.error(`Error starting dispersal for ${intentId}:`, err);
+      // Update status to failed if we can't start dispersal
+      this.store
+        .updateIntent(intentId, {
+          status: "FAILED",
+          globalPhase: "FAILED",
+          completedAt: new Date().toISOString(),
+        })
+        .catch((updateErr) => {
+          console.error(`Error updating intent status:`, updateErr);
+        });
     });
 
     return updated;
@@ -128,28 +136,124 @@ export class DispersalService {
   }
 
   /**
-   * Stub method to simulate dispersal start
-   * In real implementation, this would be replaced with actual blockchain calls
+   * Start dispersal for all destination chains
+   * Calls the drip function on each destination chain's escrow contract
    */
-  private async simulateDispersalStart(intentId: string): Promise<void> {
-    // This is a stub - in real implementation:
-    // 1. Call swap service to convert USDC -> native token on source chain
-    // 2. For each destination chain:
-    //    - Calculate native amount needed based on USD amount and current price
-    //    - Build transaction to send native token to user address
-    //    - Broadcast transaction
-    //    - Call updateChainDispersalStatus with BROADCASTED status
-    // 3. Set up listeners/polling to detect when transactions are confirmed
-    // 4. Call updateChainDispersalStatus with CONFIRMED status when confirmed
+  private async startDispersal(intentId: string): Promise<void> {
+    const intent = await this.store.getIntentById(intentId);
+    if (!intent) {
+      throw new Error(`Intent not found: ${intentId}`);
+    }
 
-    console.log(`[STUB] Would start dispersal for intent ${intentId}`);
-    // Simulate async processing delay
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    console.log(`🚀 Starting dispersal for intent ${intentId}`);
 
-    // In real implementation, you would:
-    // - Use a service like Alchemy, Infura, or direct RPC calls
-    // - Use ethers.js or viem to build and send transactions
-    // - Track transaction hashes and poll for confirmations
-    // - Handle errors and retries
+    // Process each destination chain in parallel
+    const dispersalPromises = intent.chainStatuses.map((chain) =>
+      this.disperseToChain(intentId, intent.userAddress, chain)
+    );
+
+    // Wait for all dispersals to start (they'll continue in background)
+    await Promise.allSettled(dispersalPromises);
+  }
+
+  /**
+   * Disperse tokens to a specific destination chain
+   */
+  private async disperseToChain(
+    intentId: string,
+    userAddress: string,
+    chain: ChainDispersal
+  ): Promise<void> {
+    try {
+      // Convert USD amount to USDC raw units (USDC has 6 decimals)
+      // amountUsd is a decimal string like "20.00"
+      const usdcAmountRaw = ethers.parseUnits(chain.amountUsd, 6).toString();
+
+      console.log(
+        `💧 Dispensing to chain ${chain.chainId}: ${chain.amountUsd} USD (${usdcAmountRaw} raw USDC)`
+      );
+
+      // Call the drip function on the destination chain
+      const result = await this.blockchainService.drip(
+        chain.chainId,
+        usdcAmountRaw,
+        userAddress
+      );
+
+      // Update status to BROADCASTED
+      await this.updateChainDispersalStatus(intentId, chain.chainId, {
+        status: "BROADCASTED",
+        txHash: result.txHash,
+        explorerUrl: result.explorerUrl,
+      });
+
+      // Start polling for confirmation in the background
+      this.waitForChainConfirmation(intentId, chain.chainId, result.txHash).catch(
+        (err) => {
+          console.error(
+            `Error waiting for confirmation on chain ${chain.chainId}:`,
+            err
+          );
+          // Update status to failed
+          this.updateChainDispersalStatus(intentId, chain.chainId, {
+            status: "FAILED",
+            errorMessage: err.message || "Transaction confirmation failed",
+          }).catch((updateErr) => {
+            console.error(`Error updating chain status:`, updateErr);
+          });
+        }
+      );
+    } catch (error: any) {
+      console.error(
+        `❌ Error dispersing to chain ${chain.chainId}:`,
+        error
+      );
+
+      // Update status to failed
+      await this.updateChainDispersalStatus(intentId, chain.chainId, {
+        status: "FAILED",
+        errorMessage: error.message || "Failed to broadcast transaction",
+      });
+    }
+  }
+
+  /**
+   * Wait for a transaction to be confirmed and update status
+   */
+  private async waitForChainConfirmation(
+    intentId: string,
+    chainId: number,
+    txHash: string
+  ): Promise<void> {
+    try {
+      // Wait for confirmation (1 confirmation is usually enough for most chains)
+      const receipt = await this.blockchainService.waitForConfirmation(
+        chainId,
+        txHash,
+        1, // confirmations
+        10 * 60 * 1000 // 10 minute timeout
+      );
+
+      if (receipt.status === 0) {
+        // Transaction failed
+        throw new Error("Transaction reverted");
+      }
+
+      // Update status to CONFIRMED
+      await this.updateChainDispersalStatus(intentId, chainId, {
+        status: "CONFIRMED",
+        gasUsed: receipt.gasUsed.toString(),
+      });
+
+      console.log(
+        `✅ Chain ${chainId} confirmed: ${txHash} (gas: ${receipt.gasUsed})`
+      );
+    } catch (error: any) {
+      console.error(
+        `❌ Confirmation failed for chain ${chainId}, tx ${txHash}:`,
+        error
+      );
+      throw error;
+    }
   }
 }

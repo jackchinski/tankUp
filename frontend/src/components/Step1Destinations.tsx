@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useGasFountain } from "../context/GasFountainContext";
-import { chains } from "../data/chains";
+import { DESTINATION_CHAINS, SOURCE_CHAINS, chains } from "../data/chains";
 import {
   Search,
   Settings2,
@@ -86,9 +86,15 @@ const Step1Destinations: React.FC = () => {
     setDepositAmount(totalCost);
   }, [totalCost, setDepositAmount]);
 
-  const filteredChains = chains.filter((chain) =>
+  // Show all chains, but mark which are available
+  const allFilteredChains = chains.filter((chain) =>
     chain.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const filteredChains = allFilteredChains.map((chain) => ({
+    ...chain,
+    isAvailable: DESTINATION_CHAINS.some((dc) => dc.id === chain.id),
+  }));
 
   const isInsufficient = depositAmount < totalCost;
   const isBalanceInsufficient =
@@ -185,26 +191,40 @@ const Step1Destinations: React.FC = () => {
                     const isSelected = selectedChains.find(
                       (c) => c.id === chain.id
                     );
+                    const isAvailable = chain.isAvailable;
                     return (
                       <div
                         key={chain.id}
-                        onClick={() => toggleChain(chain)}
+                        onClick={() => isAvailable && toggleChain(chain)}
                         className={clsx(
-                          "p-3 rounded-xl border cursor-pointer transition-all flex items-center justify-between group",
+                          "p-3 rounded-xl border transition-all flex items-center justify-between group",
+                          isAvailable
+                            ? "cursor-pointer"
+                            : "cursor-not-allowed opacity-40",
                           isSelected
                             ? "bg-white/20 border-white/40 shadow-lg"
-                            : "bg-transparent border-white/5 hover:bg-white/5 hover:border-white/10"
+                            : isAvailable
+                            ? "bg-transparent border-white/5 hover:bg-white/5 hover:border-white/10"
+                            : "bg-transparent border-white/5"
                         )}
                       >
                         <div className="flex items-center gap-3">
                           <img
                             src={chain.logo}
                             alt={chain.name}
-                            className="w-8 h-8 rounded-full bg-white p-0.5"
+                            className={clsx(
+                              "w-8 h-8 rounded-full bg-white p-0.5",
+                              !isAvailable && "grayscale opacity-50"
+                            )}
                           />
                           <div>
-                            <div className="font-bold text-sm text-white">
+                            <div className="font-bold text-sm text-white flex items-center gap-2">
                               {chain.name}
+                              {!isAvailable && (
+                                <span className="text-[10px] text-white/40 font-normal">
+                                  (Coming Soon)
+                                </span>
+                              )}
                             </div>
                             <div className="text-[10px] text-white/60">
                               {chain.symbol}
@@ -216,7 +236,9 @@ const Step1Destinations: React.FC = () => {
                             "w-5 h-5 rounded-full border flex items-center justify-center transition-colors",
                             isSelected
                               ? "bg-white border-white"
-                              : "border-white/20 group-hover:border-white/40"
+                              : isAvailable
+                              ? "border-white/20 group-hover:border-white/40"
+                              : "border-white/10"
                           )}
                         >
                           {isSelected && (
@@ -484,7 +506,7 @@ const Step1Destinations: React.FC = () => {
         }
         className="w-full py-4 bg-primary text-white rounded-xl font-bold hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2 shadow-lg shadow-blue-500/20 text-lg"
       >
-        Disperse Gas
+        Review & Deposit
         <ChevronRight className="w-5 h-5" />
       </button>
     </div>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useGasFountain } from "../context/GasFountainContext";
-import { chains } from "../data/chains";
+import { SOURCE_CHAINS } from "../data/chains";
 import {
   ChevronLeft,
   ChevronRight,
@@ -45,7 +45,7 @@ const Step2Source: React.FC = () => {
 
   // Initialize defaults
   useEffect(() => {
-    if (!sourceChain) setSourceChain(chains[0]);
+    if (!sourceChain) setSourceChain(SOURCE_CHAINS[0]);
     if (!sourceToken && availableTokens.length > 0) {
       const usdc = availableTokens.find((t) => t.symbol === "USDC");
       setSourceToken(usdc || availableTokens[0]);
@@ -149,20 +149,29 @@ const Step2Source: React.FC = () => {
               <select
                 value={sourceChain?.id}
                 onChange={(e) =>
-                  setSourceChain(chains.find((c) => c.id === e.target.value)!)
+                  setSourceChain(
+                    SOURCE_CHAINS.find((c) => c.id === e.target.value)!
+                  )
                 }
                 disabled={status === "dispersing"}
                 className="w-full bg-background/50 border border-border rounded-xl p-3 appearance-none focus:outline-none focus:ring-2 focus:ring-primary/50 backdrop-blur-sm disabled:opacity-50"
               >
-                {chains.map((chain) => (
+                {SOURCE_CHAINS.map((chain) => (
                   <option key={chain.id} value={chain.id}>
                     {chain.name}
                   </option>
                 ))}
+                {chains
+                  .filter((c) => !SOURCE_CHAINS.find((sc) => sc.id === c.id))
+                  .map((chain) => (
+                    <option key={chain.id} value={chain.id} disabled>
+                      {chain.name} (Coming Soon)
+                    </option>
+                  ))}
               </select>
               <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
                 <img
-                  src={sourceChain?.logo || chains[0].logo}
+                  src={sourceChain?.logo || SOURCE_CHAINS[0].logo}
                   alt="chain"
                   className="w-6 h-6 rounded-full"
                 />
@@ -358,7 +367,7 @@ const Step2Source: React.FC = () => {
       <div className="h-[400px] lg:h-[600px]">
         <VisualizationCanvas
           isDispersing={status === "dispersing"}
-          isCompleted={status === "success"}
+          isCompleted={false}
         />
       </div>
     </div>

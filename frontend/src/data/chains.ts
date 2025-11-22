@@ -25,7 +25,8 @@ const chainIdMap: Record<string, Chain> = {
   zora: zora,
 };
 
-export const chains: ChainData[] = [
+// All available chains (for reference)
+const allChains: ChainData[] = [
   {
     id: "eth",
     name: "Ethereum",
@@ -109,8 +110,31 @@ export const chains: ChainData[] = [
   },
 ];
 
+// For demo: Only Base as source, Base/Arbitrum/Optimism/Polygon as destinations
+export const SOURCE_CHAINS = allChains.filter((chain) => chain.id === "base");
+export const DESTINATION_CHAINS = allChains.filter((chain) =>
+  ["base", "arb", "op", "poly"].includes(chain.id)
+);
+
+// Export all chains for backward compatibility
+export const chains = allChains;
+
 export const getViemChain = (chainId: string): Chain | undefined => {
   return chainIdMap[chainId];
+};
+
+// Map numeric chain IDs to string chain IDs
+export const getChainIdFromNumeric = (
+  numericChainId: number
+): string | undefined => {
+  const chain = chains.find((c) => c.viemChain.id === numericChainId);
+  return chain?.id;
+};
+
+// Map string chain IDs to numeric chain IDs
+export const getNumericChainId = (chainId: string): number | undefined => {
+  const chain = chains.find((c) => c.id === chainId);
+  return chain?.viemChain.id;
 };
 
 export { chainIdMap };

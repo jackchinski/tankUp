@@ -5,7 +5,7 @@ import React, {
   useEffect,
   useCallback,
 } from "react";
-import { chains } from "../data/chains";
+import { chains, SOURCE_CHAINS, DESTINATION_CHAINS } from "../data/chains";
 import { useAccount, useSwitchChain } from "wagmi";
 import { useTokenBalances } from "../hooks/useTokenBalances";
 import { getViemChain } from "../data/chains";
@@ -31,7 +31,7 @@ export const useGasFountain = (): GasFountainContextType => {
 export const GasFountainProvider: React.FC<GasFountainProviderProps> = ({
   children,
 }) => {
-  const [currentStep, setCurrentStep] = useState<number>(1);
+  const [currentStep, setCurrentStep] = useState<number>(2);
   const [selectedChains, setSelectedChains] = useState<ChainData[]>([]);
   const [transactionCounts, setTransactionCounts] = useState<
     Record<string, number>
@@ -57,6 +57,9 @@ export const GasFountainProvider: React.FC<GasFountainProviderProps> = ({
       status: "Success",
     },
   ]);
+  const [depositTxHash, setDepositTxHash] = useState<string | undefined>(
+    undefined
+  );
 
   const { address, isConnected, chainId } = useAccount();
   const { switchChain } = useSwitchChain();
@@ -64,20 +67,20 @@ export const GasFountainProvider: React.FC<GasFountainProviderProps> = ({
   const { balances: tokenBalances, isLoading: balancesLoading } =
     useTokenBalances(sourceChainId);
 
-  // Initialize with all chains selected and default 10 txs
+  // Initialize with destination chains selected and default 10 txs
   useEffect(() => {
     if (selectedChains.length === 0) {
-      setSelectedChains(chains);
+      setSelectedChains(DESTINATION_CHAINS);
       const initialCounts: Record<string, number> = {};
-      chains.forEach((c) => (initialCounts[c.id] = 10));
+      DESTINATION_CHAINS.forEach((c) => (initialCounts[c.id] = 10));
       setTransactionCounts(initialCounts);
     }
   }, [selectedChains.length]);
 
-  // Initialize source chain
+  // Initialize source chain to Base
   useEffect(() => {
-    if (!sourceChain && chains.length > 0) {
-      setSourceChainState(chains[0]);
+    if (!sourceChain && SOURCE_CHAINS.length > 0) {
+      setSourceChainState(SOURCE_CHAINS[0]);
     }
   }, [sourceChain]);
 
@@ -140,6 +143,9 @@ export const GasFountainProvider: React.FC<GasFountainProviderProps> = ({
     // Token balances
     tokenBalances,
     balancesLoading,
+    // Deposit transaction
+    depositTxHash,
+    setDepositTxHash,
   };
 
   return (

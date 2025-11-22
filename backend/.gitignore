@@ -5,3 +5,6 @@ dist/
 .env.local
 .DS_Store
 
+# Prisma
+prisma/migrations/
+

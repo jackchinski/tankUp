@@ -1,42 +1,87 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useGasFountain } from "../context/GasFountainContext";
 import VisualizationCanvas from "./VisualizationCanvas";
 import { Check, Loader2 } from "lucide-react";
+import { useMockIntentStatus } from "../hooks/useMockIntentStatus";
 
 type Status = "dispersing" | "success";
 
 const Step2Execution: React.FC = () => {
-  const { setCurrentStep, selectedChains, depositAmount, setHistory } =
-    useGasFountain();
+  const {
+    setCurrentStep,
+    selectedChains,
+    depositAmount,
+    setHistory,
+    transactionCounts,
+    depositTxHash,
+  } = useGasFountain();
 
-  const [status, setStatus] = useState<Status>("dispersing"); // Start dispersing immediately
-  const [progressStep, setProgressStep] = useState<number>(1); // 1: Swapping, 2: Bridging, 3: Dispersing
+  // Use the actual deposit transaction hash, or generate a mock for demo
+  const intentId =
+    depositTxHash ||
+    `0x${Array.from({ length: 64 }, () =>
+      Math.floor(Math.random() * 16).toString(16)
+    ).join("")}`;
 
+  const [status, setStatus] = useState<Status>("dispersing");
+  const historyAddedRef = useRef(false);
+
+  // Use mock hook to track intent status
+  const { data: intentData } = useMockIntentStatus({
+    intentId,
+    selectedChains,
+    transactionCounts,
+    enabled: true,
+    pollInterval: 3000,
+  });
+
+  // Update status and progress based on intent data
   useEffect(() => {
-    // Mock sequence
-    const timer1 = setTimeout(() => setProgressStep(2), 2000);
-    const timer2 = setTimeout(() => setProgressStep(3), 4000);
-    const timer3 = setTimeout(() => {
-      setStatus("success");
-      // Add to history
-      setHistory((prev) => [
-        {
-          id: Date.now(),
-          timestamp: Date.now(),
-          amount: depositAmount,
-          chains: selectedChains.length,
-          status: "Success",
-        },
-        ...prev,
-      ]);
-    }, 6000);
+    if (!intentData?.intent) return;
 
-    return () => {
-      clearTimeout(timer1);
-      clearTimeout(timer2);
-      clearTimeout(timer3);
-    };
-  }, [depositAmount, selectedChains.length, setHistory]);
+    const intent = intentData.intent;
+
+    // Check if all chains are confirmed (completed)
+    const isCompleted =
+      intent.status === "DISPERSED" || intent.globalPhase === "COMPLETED";
+
+    if (isCompleted && status === "dispersing") {
+      setStatus("success");
+
+      // Add to history only once
+      if (!historyAddedRef.current) {
+        historyAddedRef.current = true;
+        setHistory((prev) => [
+          {
+            id: Date.now(),
+            timestamp: Date.now(),
+            amount: depositAmount,
+            chains: selectedChains.length,
+            status: "Success" as const,
+          },
+          ...prev,
+        ]);
+      }
+    }
+  }, [intentData, status, depositAmount, selectedChains.length, setHistory]);
+
+  // Get status message based on globalPhase
+  const getStatusMessage = (): string => {
+    if (!intentData?.intent) return "Bridging assets...";
+
+    const phase = intentData.intent.globalPhase;
+    switch (phase) {
+      case "PREPARING_SWAP":
+      case "SWAPPING":
+        return "Swapping tokens...";
+      case "DISPERSING":
+        return "Finalizing dispersion...";
+      case "COMPLETED":
+        return "Dispersion complete!";
+      default:
+        return "Bridging assets...";
+    }
+  };
 
   if (status === "success") {
     return (
@@ -64,24 +109,25 @@ const Step2Execution: React.FC = () => {
   }
 
   return (
-    <div className="w-full max-w-6xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="glass-card rounded-2xl p-8 h-[700px] relative flex flex-col">
-        <div className="absolute top-8 left-8 z-10 px-4 py-3 glass-card rounded-xl backdrop-blur-md">
-          <h2 className="text-xl font-bold mb-1">Dispersing Gas</h2>
+    <div className="w-full max-w-6xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500 mt-4">
+      <div className="glass-card rounded-2xl p-8 h-[800px] relative flex flex-col overflow-hidden">
+        <div className="absolute top-8 left-8 z-30  rounded-lg px-4 py-2">
+          <h2 className="text-xl font-bold mb-2">Dispersing Gas</h2>
           <div className="flex items-center gap-2 text-sm text-secondary">
             <Loader2 className="w-4 h-4 animate-spin" />
-            <span>
-              {progressStep === 1
-                ? "Swapping tokens..."
-                : progressStep === 2
-                ? "Bridging assets..."
-                : "Finalizing dispersion..."}
-            </span>
+            <span>{getStatusMessage()}</span>
           </div>
         </div>
 
-        <div className="flex-1 w-full h-full pt-4">
-          <VisualizationCanvas isDispersing={true} isCompleted={false} />
+        <div className="flex-1 w-full h-full pt-20 relative overflow-hidden">
+          <VisualizationCanvas
+            isDispersing={true}
+            isCompleted={
+              intentData?.intent?.status === "DISPERSED" ||
+              intentData?.intent?.globalPhase === "COMPLETED"
+            }
+            intentId={intentId}
+          />
         </div>
       </div>
     </div>

@@ -5,6 +5,7 @@ import Header from "./components/Header";
 import ActivityLog from "./components/ActivityLog";
 import Step1Destinations from "./components/Step1Destinations";
 import Step2Execution from "./components/Step2Execution";
+import Step3Review from "./components/Step3Review";
 import { createConfig, http, WagmiProvider } from "wagmi";
 import {
   arbitrum,
@@ -52,7 +53,8 @@ const MainContent: React.FC = () => {
     <div className="space-y-8">
       <div className="min-h-[400px]">
         {currentStep === 1 && <Step1Destinations />}
-        {currentStep === 2 && <Step2Execution />}
+        {currentStep === 2 && <Step3Review />}
+        {currentStep === 3 && <Step2Execution />}
       </div>
 
       <ActivityLog />
