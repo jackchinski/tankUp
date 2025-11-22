@@ -21,7 +21,9 @@ const DepositEventSchema = z.object({
   eventName: z.literal("Deposited"),
   data: z.object({
     user: z.string().regex(/^0x[a-fA-F0-9]{40}$/, "Invalid address format"),
-    token: z.string().regex(/^0x[a-fA-F0-9]{40}$/, "Invalid token address format"),
+    token: z
+      .string()
+      .regex(/^0x[a-fA-F0-9]{40}$/, "Invalid token address format"),
     amountTokenRaw: z.string(),
     amountUsd: z.string(),
     allocations: z
@@ -36,9 +38,18 @@ const DepositEventSchema = z.object({
 });
 
 const HistoryQuerySchema = z.object({
-  userAddress: z.string().regex(/^0x[a-fA-F0-9]{40}$/, "Invalid address format").optional(),
+  userAddress: z
+    .string()
+    .regex(/^0x[a-fA-F0-9]{40}$/, "Invalid address format")
+    .optional(),
   status: z
-    .enum(["DEPOSIT_CONFIRMED", "DISPERSE_QUEUED", "DISPERSE_IN_PROGRESS", "DISPERSED", "FAILED"])
+    .enum([
+      "DEPOSIT_CONFIRMED",
+      "DISPERSE_QUEUED",
+      "DISPERSE_IN_PROGRESS",
+      "DISPERSED",
+      "FAILED",
+    ])
     .optional(),
   limit: z
     .string()
@@ -57,13 +68,17 @@ export function registerRoutes(
   // GET /status/:intentId
   fastify.get<{ Params: { intentId: string } }>(
     "/status/:intentId",
-    async (request: FastifyRequest<{ Params: { intentId: string } }>, reply: FastifyReply) => {
+    async (
+      request: FastifyRequest<{ Params: { intentId: string } }>,
+      reply: FastifyReply
+    ) => {
       const { intentId } = request.params;
 
       // Basic validation
       if (!intentId || intentId.length !== 66 || !intentId.startsWith("0x")) {
         const error: ApiError = {
-          error: "Invalid intentId format. Expected a 0x-prefixed 64-character hex string.",
+          error:
+            "Invalid intentId format. Expected a 0x-prefixed 64-character hex string.",
           code: "VALIDATION_ERROR",
         };
         return reply.code(400).send(error);
@@ -90,7 +105,10 @@ export function registerRoutes(
   // GET /history
   fastify.get<{ Querystring: z.infer<typeof HistoryQuerySchema> }>(
     "/history",
-    async (request: FastifyRequest<{ Querystring: any }>, reply: FastifyReply) => {
+    async (
+      request: FastifyRequest<{ Querystring: any }>,
+      reply: FastifyReply
+    ) => {
       try {
         const query = HistoryQuerySchema.parse(request.query);
 
@@ -174,7 +192,9 @@ export function registerRoutes(
 
         // Enqueue dispersal for all destination chains
         // This will transition status to DISPERSE_QUEUED and globalPhase to PREPARING_SWAP
-        const updatedIntent = await dispersalService.enqueueDispersal(intent.id);
+        const updatedIntent = await dispersalService.enqueueDispersal(
+          intent.id
+        );
 
         const response: PostEventResponse = {
           ok: true,
@@ -199,4 +219,3 @@ export function registerRoutes(
     }
   );
 }
-

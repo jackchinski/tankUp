@@ -32,7 +32,9 @@ async function main() {
   // Start server
   try {
     await fastify.listen({ port: PORT, host: HOST });
-    console.log(`🚀 Gas Fountain backend server listening on http://${HOST}:${PORT}`);
+    console.log(
+      `🚀 Gas Fountain backend server listening on http://${HOST}:${PORT}`
+    );
     console.log(`📊 Health check: http://${HOST}:${PORT}/health`);
     console.log(`📈 Status endpoint: http://${HOST}:${PORT}/status/:intentId`);
     console.log(`📜 History endpoint: http://${HOST}:${PORT}/history`);
@@ -58,4 +60,3 @@ main().catch((err) => {
   console.error("Fatal error starting server:", err);
   process.exit(1);
 });
-

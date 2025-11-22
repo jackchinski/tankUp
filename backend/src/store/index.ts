@@ -1,8 +1,4 @@
-import {
-  DepositIntent,
-  DepositEventPayload,
-  IntentStatus,
-} from "../types";
+import { DepositIntent, DepositEventPayload, IntentStatus } from "../types";
 
 export interface IntentStore {
   upsertFromDepositEvent(payload: DepositEventPayload): Promise<DepositIntent>;
@@ -13,7 +9,10 @@ export interface IntentStore {
     limit: number;
     cursor?: string;
   }): Promise<{ items: DepositIntent[]; nextCursor?: string }>;
-  updateIntent(id: string, patch: Partial<DepositIntent>): Promise<DepositIntent>;
+  updateIntent(
+    id: string,
+    patch: Partial<DepositIntent>
+  ): Promise<DepositIntent>;
 }
 
 // In-memory implementation
@@ -21,7 +20,9 @@ export interface IntentStore {
 export class InMemoryIntentStore implements IntentStore {
   private intents: Map<string, DepositIntent> = new Map();
 
-  async upsertFromDepositEvent(payload: DepositEventPayload): Promise<DepositIntent> {
+  async upsertFromDepositEvent(
+    payload: DepositEventPayload
+  ): Promise<DepositIntent> {
     const existing = this.intents.get(payload.txHash);
     if (existing) {
       // Idempotent: return existing intent
@@ -78,7 +79,10 @@ export class InMemoryIntentStore implements IntentStore {
 
     // Filter by userAddress if provided
     if (opts.userAddress) {
-      items = items.filter((intent) => intent.userAddress.toLowerCase() === opts.userAddress!.toLowerCase());
+      items = items.filter(
+        (intent) =>
+          intent.userAddress.toLowerCase() === opts.userAddress!.toLowerCase()
+      );
     }
 
     // Filter by status if provided
@@ -87,7 +91,10 @@ export class InMemoryIntentStore implements IntentStore {
     }
 
     // Sort by createdAt descending (most recent first)
-    items.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    items.sort(
+      (a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
 
     // Simple cursor-based pagination (using createdAt as cursor)
     let startIndex = 0;
@@ -100,7 +107,9 @@ export class InMemoryIntentStore implements IntentStore {
 
     const paginatedItems = items.slice(startIndex, startIndex + opts.limit);
     const nextCursor =
-      startIndex + opts.limit < items.length ? paginatedItems[paginatedItems.length - 1]?.id : undefined;
+      startIndex + opts.limit < items.length
+        ? paginatedItems[paginatedItems.length - 1]?.id
+        : undefined;
 
     return {
       items: paginatedItems,
@@ -108,7 +117,10 @@ export class InMemoryIntentStore implements IntentStore {
     };
   }
 
-  async updateIntent(id: string, patch: Partial<DepositIntent>): Promise<DepositIntent> {
+  async updateIntent(
+    id: string,
+    patch: Partial<DepositIntent>
+  ): Promise<DepositIntent> {
     const existing = this.intents.get(id);
     if (!existing) {
       throw new Error(`Intent not found: ${id}`);
@@ -124,4 +136,3 @@ export class InMemoryIntentStore implements IntentStore {
     return updated;
   }
 }
-

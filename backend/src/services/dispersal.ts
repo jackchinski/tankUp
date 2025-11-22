@@ -24,11 +24,13 @@ export class DispersalService {
     }
 
     // Transition all chain statuses from NOT_STARTED to QUEUED
-    const updatedChainStatuses: ChainDispersal[] = intent.chainStatuses.map((chain) => ({
-      ...chain,
-      status: chain.status === "NOT_STARTED" ? "QUEUED" : chain.status,
-      updatedAt: new Date().toISOString(),
-    }));
+    const updatedChainStatuses: ChainDispersal[] = intent.chainStatuses.map(
+      (chain) => ({
+        ...chain,
+        status: chain.status === "NOT_STARTED" ? "QUEUED" : chain.status,
+        updatedAt: new Date().toISOString(),
+      })
+    );
 
     const updated = await this.store.updateIntent(intentId, {
       status: "DISPERSE_QUEUED",
@@ -84,9 +86,15 @@ export class DispersalService {
     });
 
     // Determine new intent status and global phase based on chain statuses
-    const allConfirmed = updatedChainStatuses.every((chain) => chain.status === "CONFIRMED");
-    const anyFailed = updatedChainStatuses.some((chain) => chain.status === "FAILED");
-    const anyBroadcasted = updatedChainStatuses.some((chain) => chain.status === "BROADCASTED");
+    const allConfirmed = updatedChainStatuses.every(
+      (chain) => chain.status === "CONFIRMED"
+    );
+    const anyFailed = updatedChainStatuses.some(
+      (chain) => chain.status === "FAILED"
+    );
+    const anyBroadcasted = updatedChainStatuses.some(
+      (chain) => chain.status === "BROADCASTED"
+    );
     const anyInProgress = updatedChainStatuses.some(
       (chain) => chain.status === "BROADCASTED" || chain.status === "QUEUED"
     );
@@ -145,4 +153,3 @@ export class DispersalService {
     // - Handle errors and retries
   }
 }
-
