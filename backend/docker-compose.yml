@@ -1,0 +1,88 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: gas-fountain-db
+    environment:
+      POSTGRES_USER: ${DB_USER:-gasfountain}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-gasfountain123}
+      POSTGRES_DB: ${DB_NAME:-gasfountain}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-gasfountain}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - gas-fountain-network
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: gas-fountain-backend
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: ${PORT:-3000}
+      HOST: ${HOST:-0.0.0.0}
+      # Database connection (used by Prisma)
+      DATABASE_URL: postgresql://${DB_USER:-gasfountain}:${DB_PASSWORD:-gasfountain123}@postgres:5432/${DB_NAME:-gasfountain}?schema=public
+      # Legacy DB env vars (for compatibility)
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: ${DB_USER:-gasfountain}
+      DB_PASSWORD: ${DB_PASSWORD:-gasfountain123}
+      DB_NAME: ${DB_NAME:-gasfountain}
+      INDEXER_SECRET: ${INDEXER_SECRET:-}
+      DISTRIBUTOR_PRIVATE_KEY: ${DISTRIBUTOR_PRIVATE_KEY:-}
+      # Contract addresses (set in .env file)
+      CONTRACT_ADDRESS_1: ${CONTRACT_ADDRESS_1:-}
+      CONTRACT_ADDRESS_10: ${CONTRACT_ADDRESS_10:-0xAB8F16Fa5C88e978344AeC037998Ca32Bf4e9CbD}
+      CONTRACT_ADDRESS_42161: ${CONTRACT_ADDRESS_42161:-0x541BB5476eA25f6a05Cf28F08cb4eB8cF9e8Da10}
+      CONTRACT_ADDRESS_8453: ${CONTRACT_ADDRESS_8453:-0xEfE0B3eFB879891D16145B93f21369ddE8FAaA15}
+      CONTRACT_ADDRESS_480: ${CONTRACT_ADDRESS_480:-0xCDaC32EfB5546c3cCB1bf6CD262324733B90385e}
+      CONTRACT_ADDRESS_137: ${CONTRACT_ADDRESS_137:-}
+      CONTRACT_ADDRESS_56: ${CONTRACT_ADDRESS_56:-}
+      CONTRACT_ADDRESS_43114: ${CONTRACT_ADDRESS_43114:-}
+      CONTRACT_ADDRESS_534352: ${CONTRACT_ADDRESS_534352:-}
+      CONTRACT_ADDRESS_7777777: ${CONTRACT_ADDRESS_7777777:-}
+      # Optional RPC URLs
+      ETH_RPC_URL: ${ETH_RPC_URL:-}
+      OP_RPC_URL: ${OP_RPC_URL:-}
+      ARB_RPC_URL: ${ARB_RPC_URL:-}
+      BASE_RPC_URL: ${BASE_RPC_URL:-}
+      BSC_RPC_URL: ${BSC_RPC_URL:-}
+      AVAX_RPC_URL: ${AVAX_RPC_URL:-}
+      SCROLL_RPC_URL: ${SCROLL_RPC_URL:-}
+      ZORA_RPC_URL: ${ZORA_RPC_URL:-}
+    ports:
+      - "${PORT:-3000}:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./src:/app/src
+      - ./package.json:/app/package.json
+      - ./package-lock.json:/app/package-lock.json
+      - ./tsconfig.json:/app/tsconfig.json
+      - ./prisma:/app/prisma
+    networks:
+      - gas-fountain-network
+    # Run migrations first, then start dev server
+    # Use the prisma binary from node_modules to ensure correct version
+    # For first run, use db push (creates schema without migrations)
+    # For production, use: ./node_modules/.bin/prisma migrate deploy
+    command: sh -c "sleep 5 && ./node_modules/.bin/prisma db push --accept-data-loss --skip-generate && npm run dev"
+
+volumes:
+  postgres_data:
+
+networks:
+  gas-fountain-network:
+    driver: bridge
+

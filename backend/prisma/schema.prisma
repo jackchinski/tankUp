@@ -1,0 +1,36 @@
+// Prisma schema for Gas Fountain backend
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Intent {
+  id                  String   @id // txHash (0x + 64 hex chars)
+  userAddress         String   @map("user_address")
+  sourceChainId       Int      @map("source_chain_id")
+  sourceTxHash        String   @map("source_tx_hash")
+  sourceBlockNumber   Int?     @map("source_block_number")
+  tokenAddress        String   @map("token_address")
+  tokenSymbol         String?  @map("token_symbol")
+  amountInTokenRaw    String   @map("amount_in_token_raw") // bigint string
+  amountInUsd         String   @map("amount_in_usd") // decimal string
+  status              String   // IntentStatus enum
+  globalPhase         String   @map("global_phase") // GlobalPhase enum
+  allocations         Json     // DestinationAllocation[]
+  chainStatuses       Json     @map("chain_statuses") // ChainDispersal[]
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+  completedAt        DateTime? @map("completed_at")
+
+  @@index([userAddress])
+  @@index([status])
+  @@index([createdAt(sort: Desc)])
+  @@index([sourceChainId])
+  @@map("intents")
+}
+
