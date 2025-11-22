@@ -1,2 +1,10 @@
 /node_modules
 .env
+/artifacts
+/cache
+/typechain-types
+/.pnpm-store
+*.tsbuildinfo
+.DS_Store
+coverage/
+coverage.json
