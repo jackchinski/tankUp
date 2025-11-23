@@ -1,8 +1,14 @@
-import { ethers, run, network } from "hardhat";
+import hardhat, { network } from "hardhat";
+import type { Address } from "viem";
 
 async function main() {
-  // Resolve per-network defaults; allow env overrides
-  const { chainId, name } = await ethers.provider.getNetwork();
+  const { viem } = await network.connect();
+  const publicClient = await viem.getPublicClient();
+  const [deployer] = await viem.getWalletClients();
+
+  // Resolve per-network defaults; allow env overrides (using viem)
+  const chainId = await publicClient.getChainId();
+  const name = publicClient.chain?.name ?? String(chainId);
   const defaults: Record<number, { USDC: string; WETH: string; ROUTER: string }> = {
     // Base mainnet
     8453: {
@@ -17,14 +23,14 @@ async function main() {
       USDC: "0xaf88d065e77c8cc2239327c5edb3a432268e5831",
       WETH: "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1",
       // Uniswap V3 SwapRouter (canonical V3)
-      ROUTER: "0xE592427A0AEce92De3Edee1F18E0157C05861564",
+      ROUTER: "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45",
     },
     // Optimism
     10: {
       // USDC.e (bridged) default; override with native USDC via env if desired
-      USDC: "0x7F5c764cBc14f9669B88837ca1490cCa17c31607",
+      USDC: "0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85",
       WETH: "0x4200000000000000000000000000000000000006",
-      ROUTER: "0xE592427A0AEce92De3Edee1F18E0157C05861564",
+      ROUTER: "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45",
     },
     // Worldchain (chainId 480)
     480: {
@@ -43,64 +49,35 @@ async function main() {
     );
   }
 
-  const USDC = (envUSDC ?? netDefaults?.USDC ?? "").toLowerCase();
-  const WETH = (envWETH ?? netDefaults?.WETH ?? "").toLowerCase();
-  const SWAP_ROUTER = (envROUTER ?? netDefaults?.ROUTER ?? "").toLowerCase();
+  const USDC = (envUSDC ?? netDefaults?.USDC ?? "") as Address;
+  const WETH = (envWETH ?? netDefaults?.WETH ?? "") as Address;
+  const SWAP_ROUTER = (envROUTER ?? netDefaults?.ROUTER ?? "") as Address;
   // Prefer 3000 (0.3%) on Base; allow override via env
   const POOL_FEE = Number(process.env.UNI_POOL_FEE ?? "3000");
 
-  const [deployer] = await ethers.getSigners();
-  console.log("Deploying with:", deployer.address);
-  console.log("Deployer balance:", (await deployer.provider!.getBalance(deployer.address)).toString());
+  console.log("Deploying with:", deployer.account.address);
+  const deployerBal = await publicClient.getBalance({ address: deployer.account.address });
+  console.log("Deployer balance:", deployerBal.toString());
 
   // Sanity: router must have code on this network
-  const routerCode = await ethers.provider.getCode(SWAP_ROUTER);
-  if (routerCode === "0x") {
-    throw new Error(`SwapRouter address has no code on ${(await ethers.provider.getNetwork()).name}: ${SWAP_ROUTER}`);
+  const routerCode = await publicClient.getBytecode({ address: SWAP_ROUTER });
+  if (routerCode === null) {
+    throw new Error(`SwapRouter address has no code on ${name}: ${SWAP_ROUTER}`);
   }
   // Sanity: USDC must be a contract
-  const usdcCode = await ethers.provider.getCode(USDC);
-  if (usdcCode === "0x") {
-    throw new Error(`USDC address has no code on ${(await ethers.provider.getNetwork()).name}: ${USDC}`);
+  const usdcCode = await publicClient.getBytecode({ address: USDC });
+  if (usdcCode === null) {
+    throw new Error(`USDC address has no code on ${name}: ${USDC}`);
   }
 
-  const Factory = await ethers.getContractFactory("GasStation");
-  const contract = await Factory.deploy(USDC, SWAP_ROUTER, WETH, POOL_FEE);
-
-  await contract.waitForDeployment();
-
-  const addr = await contract.getAddress();
+  // Deploy using hardhat-viem helper
+  const contract = await viem.deployContract("GasStation", [USDC, SWAP_ROUTER, WETH, POOL_FEE], {
+    client: { wallet: deployer },
+  });
+  const addr = contract.address as Address;
   console.log("GasStation deployed to:", addr);
 
-  // Optional: wait for a few confirmations before verifying
-  const tx = contract.deploymentTransaction();
-  if (tx) {
-    await tx.wait(5);
-  }
-
-  // Verify on Basescan/Etherscan via hardhat-verify
-  const supportedForAutoVerify = new Set<number>([8453, 42161, 10]); // base, arbitrum, optimism
-  if (supportedForAutoVerify.has(Number(chainId))) {
-    try {
-      console.log("Verifying contract...");
-      await run("verify:verify", {
-        address: addr,
-        constructorArguments: [USDC, SWAP_ROUTER, WETH, POOL_FEE],
-      });
-      console.log("Verification complete on", network.name);
-    } catch (e: any) {
-      const msg = (e?.message || "").toLowerCase();
-      if (msg.includes("already verified")) {
-        console.log("Already verified. Skipping.");
-      } else {
-        console.error("Verification failed:", e);
-      }
-    }
-  } else {
-    console.log(
-      `Skipping auto-verify on chainId ${chainId} (${name}). Configure etherscan.customChains for this network's explorer and verify manually if desired.`
-    );
-  }
+  // Note: verification is not performed here; run a separate verify task if needed.
 }
 
 main().catch((error) => {

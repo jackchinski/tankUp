@@ -3,9 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useGasFountain } from "../context/GasFountainContext";
 import { chains, getNumericChainId } from "../data/chains";
 import { ChainDispersal, ChainDispersalStatus } from "../types";
-// TODO: Switch to useIntentStatus when backend is ready
-import { useMockIntentStatus } from "../hooks/useMockIntentStatus";
-// import { useIntentStatus } from "../hooks/useIntentStatus";
+import { useIntentStatus } from "../hooks/useIntentStatus";
 
 interface VisualizationCanvasProps {
   isDispersing: boolean;
@@ -46,11 +44,8 @@ const VisualizationCanvas: React.FC<VisualizationCanvasProps> = ({
   );
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Use mock hook for now - switch to useIntentStatus when backend is ready
-  const { data: intentData } = useMockIntentStatus({
+  const { data: intentData } = useIntentStatus({
     intentId: intentId && isDispersing ? intentId : undefined,
-    selectedChains,
-    transactionCounts,
     enabled: !!intentId && isDispersing,
     pollInterval: 3000,
   });

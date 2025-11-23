@@ -30,9 +30,7 @@ export class BlockchainService {
     // Initialize signer from private key
     const privateKey = process.env.DISTRIBUTOR_PRIVATE_KEY;
     if (!privateKey) {
-      console.warn(
-        "⚠️  DISTRIBUTOR_PRIVATE_KEY not set. Contract calls will fail."
-      );
+      console.warn("⚠️  DISTRIBUTOR_PRIVATE_KEY not set. Contract calls will fail.");
     } else {
       // We'll create signers per-chain when needed
       console.log("✅ Distributor private key loaded");
@@ -46,9 +44,7 @@ export class BlockchainService {
     if (!this.providers.has(chainId)) {
       const config = getChainConfig(chainId);
       if (!config) {
-        throw new Error(
-          `Chain configuration not found for chainId: ${chainId}`
-        );
+        throw new Error(`Chain configuration not found for chainId: ${chainId}`);
       }
 
       const provider = new ethers.JsonRpcProvider(config.rpcUrl);
@@ -78,11 +74,7 @@ export class BlockchainService {
    * @param recipient Address to receive the native tokens
    * @returns Transaction hash and explorer URL
    */
-  async drip(
-    chainId: number,
-    usdcAmount: string,
-    recipient: string
-  ): Promise<DripResult> {
+  async drip(chainId: number, usdcAmount: string, recipient: string): Promise<DripResult> {
     const config = getChainConfig(chainId);
     if (!config) {
       throw new Error(`Chain configuration not found for chainId: ${chainId}`);
@@ -109,11 +101,31 @@ export class BlockchainService {
       // Convert usdcAmount string to BigInt for the contract call
       const usdcAmountBigInt = BigInt(usdcAmount);
 
-      const tx = await contract.drip(usdcAmountBigInt, recipient, {
-        // Gas limit will be estimated automatically, but we can set a max
-        maxFeePerGas: ethers.parseUnits("100", "gwei"), // Adjust based on chain
-        maxPriorityFeePerGas: ethers.parseUnits("2", "gwei"),
-      });
+      // Match fee args used in contracts/scripts/drip-op.ts
+      const fee = await signer.provider!.getFeeData();
+      const bumpPct = 25n;
+      const bump = (v: bigint | null | undefined) => (v != null ? (v * (100n + bumpPct)) / 100n : undefined);
+      const overrides: {
+        gasLimit: bigint;
+        maxFeePerGas?: bigint;
+        maxPriorityFeePerGas?: bigint;
+        gasPrice?: bigint;
+      } = { gasLimit: 750000n };
+
+      // Prefer EIP-1559 if both fields are available; otherwise use legacy gasPrice
+      const suggestedMaxFee = bump(fee.maxFeePerGas);
+      const suggestedPriority = bump(fee.maxPriorityFeePerGas);
+      if (suggestedMaxFee != null && suggestedPriority != null) {
+        // Clamp: priority must never exceed max fee
+        const maxFeePerGas = suggestedMaxFee;
+        const maxPriorityFeePerGas = suggestedPriority > maxFeePerGas ? maxFeePerGas : suggestedPriority;
+        overrides.maxFeePerGas = maxFeePerGas;
+        overrides.maxPriorityFeePerGas = maxPriorityFeePerGas;
+      } else if (fee.gasPrice != null) {
+        overrides.gasPrice = bump(fee.gasPrice)!;
+      }
+
+      const tx = await contract.drip(usdcAmountBigInt, recipient, overrides);
 
       console.log(`⏳ Transaction broadcast: ${tx.hash}`);
 
@@ -125,9 +137,7 @@ export class BlockchainService {
       };
     } catch (error: any) {
       console.error(`❌ Error calling drip on chain ${chainId}:`, error);
-      throw new Error(
-        `Failed to call drip: ${error.message || "Unknown error"}`
-      );
+      throw new Error(`Failed to call drip: ${error.message || "Unknown error"}`);
     }
   }
 
@@ -148,18 +158,13 @@ export class BlockchainService {
     const provider = this.getProvider(chainId);
 
     try {
-      console.log(
-        `⏳ Waiting for confirmation of ${txHash} on chain ${chainId}...`
-      );
+      console.log(`⏳ Waiting for confirmation of ${txHash} on chain ${chainId}...`);
 
       // Wait for transaction with timeout
       const receipt = await Promise.race([
         provider.waitForTransaction(txHash, confirmations),
         new Promise<never>((_, reject) =>
-          setTimeout(
-            () => reject(new Error("Transaction confirmation timeout")),
-            timeoutMs
-          )
+          setTimeout(() => reject(new Error("Transaction confirmation timeout")), timeoutMs)
         ),
       ]);
 
@@ -167,9 +172,7 @@ export class BlockchainService {
         throw new Error("Transaction receipt not found");
       }
 
-      console.log(
-        `✅ Transaction confirmed: ${txHash} (block: ${receipt.blockNumber})`
-      );
+      console.log(`✅ Transaction confirmed: ${txHash} (block: ${receipt.blockNumber})`);
 
       return {
         txHash: receipt.hash,
@@ -200,9 +203,7 @@ export class BlockchainService {
         const receipt = await provider.getTransactionReceipt(txHash);
 
         if (receipt) {
-          console.log(
-            `✅ Transaction confirmed: ${txHash} (block: ${receipt.blockNumber})`
-          );
+          console.log(`✅ Transaction confirmed: ${txHash} (block: ${receipt.blockNumber})`);
 
           return {
             txHash: receipt.hash,
@@ -220,9 +221,7 @@ export class BlockchainService {
       }
     }
 
-    throw new Error(
-      `Transaction ${txHash} not confirmed after ${maxAttempts} attempts`
-    );
+    throw new Error(`Transaction ${txHash} not confirmed after ${maxAttempts} attempts`);
   }
 
   /**

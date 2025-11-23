@@ -1,8 +1,32 @@
 import "dotenv/config";
 import { ethers } from "ethers";
 
-const CONTRACT_ADDRESS = "0xEfE0B3eFB879891D16145B93f21369ddE8FAaA15";
-const ABI = ["event Deposited(address indexed user, uint256 totalAmount, uint256[] chainIds, uint256[] chainAmounts)"];
+const CONTRACT_ADDRESS = "0x771DffdD30Cae323afF4b72a356C023c963A8236";
+const ABI = [
+  "event Deposited(address indexed user, uint256 totalAmount, uint256[] chainIds, uint256[] chainAmounts)",
+  "function usdc() view returns (address)",
+];
+
+interface DepositEventAllocationPayload {
+  destChainId: number;
+  amountUsd: string;
+}
+
+interface DepositEventPayload {
+  chainId: number;
+  txHash: string;
+  logIndex: number;
+  blockNumber: number;
+  blockTimestamp?: number;
+  eventName: "Deposited";
+  data: {
+    user: string;
+    token: string;
+    amountTokenRaw: string;
+    amountUsd: string;
+    allocations: DepositEventAllocationPayload[];
+  };
+}
 
 function logDepositedEvent(
   evt:
@@ -58,6 +82,56 @@ function getLogKey(
   return undefined;
 }
 
+function formatUnitsDecimal(big: bigint, decimals: number): string {
+  const negative = big < 0n ? "-" : "";
+  const value = big < 0n ? -big : big;
+  const base = 10n ** BigInt(decimals);
+  const whole = value / base;
+  const fraction = value % base;
+  if (fraction === 0n) {
+    return `${negative}${whole.toString()}`;
+  }
+  const fracStr = fraction.toString().padStart(decimals, "0").replace(/0+$/, "");
+  return `${negative}${whole.toString()}.${fracStr}`;
+}
+
+async function postDepositEvent(url: string, payload: DepositEventPayload): Promise<void> {
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const errText = await res.text().catch(() => "");
+      console.error("Backend responded with non-OK status", {
+        status: res.status,
+        statusText: res.statusText,
+        body: errText,
+      });
+    } else {
+      const text = await res.text().catch(() => "");
+      console.log("✓ Forwarded Deposited event to backend", {
+        intentId: payload.txHash,
+        sourceChainId: payload.chainId,
+        allocations: payload.data.allocations,
+        backendUrl: url,
+        response: text
+          ? (() => {
+              try {
+                return JSON.parse(text);
+              } catch {
+                return text;
+              }
+            })()
+          : undefined,
+      });
+    }
+  } catch (e) {
+    console.error("Failed to POST event", e);
+  }
+}
+
 async function main(): Promise<void> {
   const rpcUrl = process.env.BASE_RPC_URL;
   if (!rpcUrl) {
@@ -68,6 +142,7 @@ async function main(): Promise<void> {
   const wsUrl = process.env.BASE_WS_URL;
   const pollingIntervalMs =
     process.env.POLLING_INTERVAL_MS !== undefined ? Number(process.env.POLLING_INTERVAL_MS) : 4000;
+  const backendUrl = process.env.BACKEND_URL || "http://localhost:3000/event";
 
   // In-memory deduplication of logs within a single process lifetime
   const seenLogKeys = new Set<string>();
@@ -76,6 +151,8 @@ async function main(): Promise<void> {
     // Preferred: WebSocket subscriptions (no eth_newFilter / filter eviction)
     const wsProvider = new ethers.WebSocketProvider(wsUrl);
     const contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, wsProvider);
+    const network = await wsProvider.getNetwork();
+    const token: string = await contract.usdc();
 
     console.log(`Listening (WebSocket) for Deposited on ${CONTRACT_ADDRESS}...`);
 
@@ -96,6 +173,38 @@ async function main(): Promise<void> {
           seenLogKeys.add(key);
         }
         logDepositedEvent({ user, totalAmount, chainIds, chainAmounts, event });
+        (async () => {
+          try {
+            const bn = ("blockNumber" in event ? event.blockNumber : undefined) as number | undefined;
+            const block = typeof bn === "number" ? await wsProvider.getBlock(bn) : null;
+            const allocations: DepositEventAllocationPayload[] = chainIds.map((cid, i) => ({
+              destChainId: Number(cid),
+              amountUsd: formatUnitsDecimal(chainAmounts[i] ?? 0n, 6),
+            }));
+            console.log("Allocations", allocations);
+            const payload: DepositEventPayload = {
+              chainId: Number(network.chainId),
+              txHash: (event as any).transactionHash,
+              logIndex: Number((event as any).index ?? (event as any).logIndex ?? 0),
+              blockNumber: Number(bn ?? 0),
+              blockTimestamp: block?.timestamp,
+              eventName: "Deposited",
+              data: {
+                user,
+                token,
+                amountTokenRaw: totalAmount.toString(),
+                amountUsd: formatUnitsDecimal(totalAmount, 6),
+                allocations,
+              },
+            };
+
+            console.log("Posting deposit event to backend", payload);
+            await postDepositEvent(backendUrl, payload);
+            console.log("Posted deposit event to backend");
+          } catch (e) {
+            console.error("Failed to prepare/send payload", e);
+          }
+        })();
       }
     );
 
@@ -119,6 +228,9 @@ async function main(): Promise<void> {
   httpProvider.pollingInterval = pollingIntervalMs;
   const iface = new ethers.Interface(ABI);
   const topic = ethers.id("Deposited(address,uint256,uint256[],uint256[])");
+  const network = await httpProvider.getNetwork();
+  const readContract = new ethers.Contract(CONTRACT_ADDRESS, ABI, httpProvider);
+  const token: string = await readContract.usdc();
 
   let lastProcessedBlock = await httpProvider.getBlockNumber();
   console.log(
@@ -168,6 +280,35 @@ async function main(): Promise<void> {
             txHash: log.transactionHash,
             blockNumber: log.blockNumber ?? undefined,
           });
+          try {
+            console.log("Getting block", log.blockNumber);
+            const block = await httpProvider.getBlock(log.blockNumber!);
+            console.log("Block", block);
+            const allocations: DepositEventAllocationPayload[] = chainIds.map((cid, i) => ({
+              destChainId: Number(cid),
+              amountUsd: formatUnitsDecimal(chainAmounts[i] ?? 0n, 6),
+            }));
+            console.log("Allocations", allocations);
+            const payload: DepositEventPayload = {
+              chainId: Number(network.chainId),
+              txHash: log.transactionHash,
+              logIndex: Number((log as any).index ?? (log as any).logIndex ?? 0),
+              blockNumber: Number(log.blockNumber ?? 0),
+              blockTimestamp: block?.timestamp,
+              eventName: "Deposited",
+              data: {
+                user,
+                token,
+                amountTokenRaw: totalAmount.toString(),
+                amountUsd: formatUnitsDecimal(totalAmount, 6),
+                allocations,
+              },
+            };
+            console.log("Posting deposit event to backend", payload);
+            await postDepositEvent(backendUrl, payload);
+          } catch (e) {
+            console.error("Failed to prepare/send payload", e);
+          }
         } catch (e) {
           console.error("Failed to parse log", e);
         }

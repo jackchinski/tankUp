@@ -18,7 +18,10 @@ interface ISwapRouter {
         uint160 sqrtPriceLimitX96;
     }
 
-    function exactInputSingle(ExactInputSingleParams calldata params) external payable returns (uint256 amountOut);
+    function exactInputSingle(ExactInputSingleParams calldata params)
+        external
+        payable
+        returns (uint256 amountOut);
 }
 
 /// @notice Minimal interface for WETH (wrapped native token)
@@ -57,11 +60,12 @@ contract GasStation is Ownable, ReentrancyGuard {
     /// @notice Allow contract to receive native token when unwrapping WETH.
     receive() external payable {}
 
-    // user deposits USDC to the contract along with the chainds and amounts for each chain
-    function deposit(uint256 totalAmount, uint256[] calldata chainIds, uint256[] calldata chainAmounts)
-        external
-        nonReentrant
-    {
+    /// @notice User deposits USDC + specifies per-chain gas distribution (off-chain logic can read this).
+    function deposit(
+        uint256 totalAmount,
+        uint256[] calldata chainIds,
+        uint256[] calldata chainAmounts
+    ) external nonReentrant {
         require(totalAmount > 0, "totalAmount = 0");
         require(chainIds.length == chainAmounts.length && chainIds.length > 0, "array length mismatch");
 
@@ -79,12 +83,13 @@ contract GasStation is Ownable, ReentrancyGuard {
         emit Deposited(msg.sender, totalAmount, chainIds, chainAmounts);
     }
 
-    // called only by the owner, it will drip the usdc amount in the native token of the chain to the recipient
-    function drip(uint256 usdcAmount, address recipient) external onlyOwner nonReentrant {
+    /// @notice Called only by the owner.
+    /// Swaps `usdcAmount` of USDC held by this contract to native token and sends it to `recipient`.
+    function drip(uint256 usdcAmount, address payable recipient) external onlyOwner nonReentrant {
         require(recipient != address(0), "recipient = zero");
         require(usdcAmount > 0, "usdcAmount = 0");
 
-        // Check balance
+        // Check USDC balance
         uint256 balance = usdc.balanceOf(address(this));
         require(balance >= usdcAmount, "insufficient USDC");
 
@@ -105,11 +110,11 @@ contract GasStation is Ownable, ReentrancyGuard {
 
         uint256 wethReceived = swapRouter.exactInputSingle(params);
 
-        // Unwrap WETH -> native token
+        // Unwrap WETH -> native token (ETH)
         weth.withdraw(wethReceived);
 
         // Forward the native token to the user
-        (bool ok,) = recipient.call{value: wethReceived}("");
+        (bool ok, ) = recipient.call{value: wethReceived}("");
         require(ok, "native transfer failed");
 
         emit Dripped(recipient, usdcAmount, wethReceived);

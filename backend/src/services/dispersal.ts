@@ -1,10 +1,4 @@
-import {
-  DepositIntent,
-  ChainDispersal,
-  ChainDispersalStatus,
-  IntentStatus,
-  GlobalPhase,
-} from "../types";
+import { DepositIntent, ChainDispersal, ChainDispersalStatus, IntentStatus, GlobalPhase } from "../types";
 import { IntentStore } from "../store";
 import { BlockchainService } from "./blockchain";
 import { ethers } from "ethers";
@@ -28,21 +22,25 @@ export class DispersalService {
     if (!intent) {
       throw new Error(`Intent not found: ${intentId}`);
     }
-
+    console.log("Enqueuing dispersal for intent", intent);
     // Transition all chain statuses from NOT_STARTED to QUEUED
-    const updatedChainStatuses: ChainDispersal[] = intent.chainStatuses.map(
-      (chain) => ({
-        ...chain,
-        status: chain.status === "NOT_STARTED" ? "QUEUED" : chain.status,
-        updatedAt: new Date().toISOString(),
-      })
-    );
+    const updatedChainStatuses: ChainDispersal[] = intent.chainStatuses.map((chain) => ({
+      ...chain,
+      status: chain.status === "NOT_STARTED" ? "QUEUED" : chain.status,
+      updatedAt: new Date().toISOString(),
+    }));
 
     const updated = await this.store.updateIntent(intentId, {
       status: "DISPERSE_QUEUED",
       globalPhase: "PREPARING_SWAP",
       chainStatuses: updatedChainStatuses,
     });
+
+    console.log(
+      `📋 Dispersal enqueued for ${intentId}: ${updated.chainStatuses.length} chains -> [${updated.chainStatuses
+        .map((c) => c.chainId)
+        .join(", ")}]`
+    );
 
     // Start actual dispersal for each destination chain
     this.startDispersal(intentId).catch((err) => {
@@ -94,15 +92,9 @@ export class DispersalService {
     });
 
     // Determine new intent status and global phase based on chain statuses
-    const allConfirmed = updatedChainStatuses.every(
-      (chain) => chain.status === "CONFIRMED"
-    );
-    const anyFailed = updatedChainStatuses.some(
-      (chain) => chain.status === "FAILED"
-    );
-    const anyBroadcasted = updatedChainStatuses.some(
-      (chain) => chain.status === "BROADCASTED"
-    );
+    const allConfirmed = updatedChainStatuses.every((chain) => chain.status === "CONFIRMED");
+    const anyFailed = updatedChainStatuses.some((chain) => chain.status === "FAILED");
+    const anyBroadcasted = updatedChainStatuses.some((chain) => chain.status === "BROADCASTED");
     const anyInProgress = updatedChainStatuses.some(
       (chain) => chain.status === "BROADCASTED" || chain.status === "QUEUED"
     );
@@ -127,12 +119,30 @@ export class DispersalService {
       newGlobalPhase = "PREPARING_SWAP";
     }
 
-    return this.store.updateIntent(intentId, {
+    const updatedIntent = await this.store.updateIntent(intentId, {
       status: newStatus,
       globalPhase: newGlobalPhase,
       chainStatuses: updatedChainStatuses,
       completedAt,
     });
+
+    // Aggregate progress log
+    const total = updatedIntent.chainStatuses.length;
+    const counts = updatedIntent.chainStatuses.reduce((acc, c) => {
+      acc[c.status] = (acc[c.status] || 0) + 1;
+      return acc;
+    }, {} as Record<ChainDispersalStatus, number>);
+    const confirmed = counts.CONFIRMED || 0;
+    const failed = counts.FAILED || 0;
+    const broadcasted = counts.BROADCASTED || 0;
+    const queued = counts.QUEUED || 0;
+    const notStarted = counts.NOT_STARTED || 0;
+    const percent = total > 0 ? Math.round((confirmed / total) * 100) : 0;
+    console.log(
+      `📈 Progress for ${intentId}: ${confirmed}/${total} confirmed (${percent}%), broadcasted: ${broadcasted}, queued: ${queued}, not_started: ${notStarted}, failed: ${failed}`
+    );
+
+    return updatedIntent;
   }
 
   /**
@@ -159,26 +169,16 @@ export class DispersalService {
   /**
    * Disperse tokens to a specific destination chain
    */
-  private async disperseToChain(
-    intentId: string,
-    userAddress: string,
-    chain: ChainDispersal
-  ): Promise<void> {
+  private async disperseToChain(intentId: string, userAddress: string, chain: ChainDispersal): Promise<void> {
     try {
       // Convert USD amount to USDC raw units (USDC has 6 decimals)
       // amountUsd is a decimal string like "20.00"
       const usdcAmountRaw = ethers.parseUnits(chain.amountUsd, 6).toString();
 
-      console.log(
-        `💧 Dispensing to chain ${chain.chainId}: ${chain.amountUsd} USD (${usdcAmountRaw} raw USDC)`
-      );
+      console.log(`💧 Dispensing to chain ${chain.chainId}: ${chain.amountUsd} USD (${usdcAmountRaw} raw USDC)`);
 
       // Call the drip function on the destination chain
-      const result = await this.blockchainService.drip(
-        chain.chainId,
-        usdcAmountRaw,
-        userAddress
-      );
+      const result = await this.blockchainService.drip(chain.chainId, usdcAmountRaw, userAddress);
 
       // Update status to BROADCASTED
       await this.updateChainDispersalStatus(intentId, chain.chainId, {
@@ -188,26 +188,18 @@ export class DispersalService {
       });
 
       // Start polling for confirmation in the background
-      this.waitForChainConfirmation(intentId, chain.chainId, result.txHash).catch(
-        (err) => {
-          console.error(
-            `Error waiting for confirmation on chain ${chain.chainId}:`,
-            err
-          );
-          // Update status to failed
-          this.updateChainDispersalStatus(intentId, chain.chainId, {
-            status: "FAILED",
-            errorMessage: err.message || "Transaction confirmation failed",
-          }).catch((updateErr) => {
-            console.error(`Error updating chain status:`, updateErr);
-          });
-        }
-      );
+      this.waitForChainConfirmation(intentId, chain.chainId, result.txHash).catch((err) => {
+        console.error(`Error waiting for confirmation on chain ${chain.chainId}:`, err);
+        // Update status to failed
+        this.updateChainDispersalStatus(intentId, chain.chainId, {
+          status: "FAILED",
+          errorMessage: err.message || "Transaction confirmation failed",
+        }).catch((updateErr) => {
+          console.error(`Error updating chain status:`, updateErr);
+        });
+      });
     } catch (error: any) {
-      console.error(
-        `❌ Error dispersing to chain ${chain.chainId}:`,
-        error
-      );
+      console.error(`❌ Error dispersing to chain ${chain.chainId}:`, error);
 
       // Update status to failed
       await this.updateChainDispersalStatus(intentId, chain.chainId, {
@@ -220,11 +212,7 @@ export class DispersalService {
   /**
    * Wait for a transaction to be confirmed and update status
    */
-  private async waitForChainConfirmation(
-    intentId: string,
-    chainId: number,
-    txHash: string
-  ): Promise<void> {
+  private async waitForChainConfirmation(intentId: string, chainId: number, txHash: string): Promise<void> {
     try {
       // Wait for confirmation (1 confirmation is usually enough for most chains)
       const receipt = await this.blockchainService.waitForConfirmation(
@@ -245,14 +233,9 @@ export class DispersalService {
         gasUsed: receipt.gasUsed.toString(),
       });
 
-      console.log(
-        `✅ Chain ${chainId} confirmed: ${txHash} (gas: ${receipt.gasUsed})`
-      );
+      console.log(`✅ Chain ${chainId} confirmed: ${txHash} (gas: ${receipt.gasUsed})`);
     } catch (error: any) {
-      console.error(
-        `❌ Confirmation failed for chain ${chainId}, tx ${txHash}:`,
-        error
-      );
+      console.error(`❌ Confirmation failed for chain ${chainId}, tx ${txHash}:`, error);
       throw error;
     }
   }

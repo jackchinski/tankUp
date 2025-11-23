@@ -1,4 +1,4 @@
-version: '3.8'
+version: "3.8"
 
 services:
   postgres:
@@ -42,10 +42,10 @@ services:
       DISTRIBUTOR_PRIVATE_KEY: ${DISTRIBUTOR_PRIVATE_KEY:-}
       # Contract addresses (set in .env file)
       CONTRACT_ADDRESS_1: ${CONTRACT_ADDRESS_1:-}
-      CONTRACT_ADDRESS_10: ${CONTRACT_ADDRESS_10:-0xAB8F16Fa5C88e978344AeC037998Ca32Bf4e9CbD}
-      CONTRACT_ADDRESS_42161: ${CONTRACT_ADDRESS_42161:-0x541BB5476eA25f6a05Cf28F08cb4eB8cF9e8Da10}
-      CONTRACT_ADDRESS_8453: ${CONTRACT_ADDRESS_8453:-0xEfE0B3eFB879891D16145B93f21369ddE8FAaA15}
-      CONTRACT_ADDRESS_480: ${CONTRACT_ADDRESS_480:-0xCDaC32EfB5546c3cCB1bf6CD262324733B90385e}
+      CONTRACT_ADDRESS_10: ${CONTRACT_ADDRESS_10:-0xfef4cc60c634c0f911a11abb120503bfabf2df66}
+      CONTRACT_ADDRESS_42161: ${CONTRACT_ADDRESS_42161:-0xe4dccc71893b66232892f1770ebe6ac75dba80b9}
+      CONTRACT_ADDRESS_8453: ${CONTRACT_ADDRESS_8453:-0x771DffdD30Cae323afF4b72a356C023c963A8236}
+      CONTRACT_ADDRESS_480: ${CONTRACT_ADDRESS_480:-0xa919f82f753c6e63ae1644f8d225c781e5287676}
       CONTRACT_ADDRESS_137: ${CONTRACT_ADDRESS_137:-}
       CONTRACT_ADDRESS_56: ${CONTRACT_ADDRESS_56:-}
       CONTRACT_ADDRESS_43114: ${CONTRACT_ADDRESS_43114:-}
@@ -73,16 +73,42 @@ services:
       - ./prisma:/app/prisma
     networks:
       - gas-fountain-network
+    env_file:
+      - .env
     # Run migrations first, then start dev server
     # Use the prisma binary from node_modules to ensure correct version
     # For first run, use db push (creates schema without migrations)
     # For production, use: ./node_modules/.bin/prisma migrate deploy
     command: sh -c "sleep 5 && ./node_modules/.bin/prisma db push --accept-data-loss --skip-generate && npm run dev"
 
+  ngrok-backend:
+    build:
+      context: ./ngrok
+      dockerfile: Dockerfile.dev
+    container_name: ngrok
+    command: "http backend:3000 --domain=${NGROK_BACKEND_PUBLIC_DOMAIN}"
+    networks:
+      - gas-fountain-network
+    environment:
+      - NGROK_AUTHTOKEN=${NGROK_BACKEND_AUTHTOKEN}
+    ports:
+      - "4041:4041"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -fs -H 'Accept: application/json' http://localhost:4041/api/tunnels | jq -r '.tunnels[0].public_url'",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
+    env_file:
+      - .env
 volumes:
   postgres_data:
 
 networks:
   gas-fountain-network:
     driver: bridge
-

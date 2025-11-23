@@ -7,3 +7,5 @@ declare const process: {
   on: (event: NodeJS.Signals, listener: (...args: any[]) => void) => void;
   exit: (code?: number) => never;
 };
+
+declare function fetch(input: string, init?: any): Promise<any>;

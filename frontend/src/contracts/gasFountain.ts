@@ -184,22 +184,18 @@ export const GAS_FOUNDATION_ABI = [
 ] as const;
 
 // Contract addresses by chain
-export const GAS_FOUNDATION_CONTRACT_ADDRESSES: Record<string, `0x${string}`> =
-  {
-    base: "0xEfE0B3eFB879891D16145B93f21369ddE8FAaA15" as `0x${string}`,
-    arb: "0x541BB5476eA25f6a05Cf28F08cb4eB8cF9e8Da10" as `0x${string}`,
-    op: "0xAB8F16Fa5C88e978344AeC037998Ca32Bf4e9CbD" as `0x${string}`,
-    world: "0xCDaC32EfB5546c3cCB1bf6CD262324733B90385e" as `0x${string}`,
-  } as const;
+export const GAS_FOUNDATION_CONTRACT_ADDRESSES: Record<string, `0x${string}`> = {
+  base: "0x771DffdD30Cae323afF4b72a356C023c963A8236" as `0x${string}`,
+  arb: "0xe4dccc71893b66232892f1770ebe6ac75dba80b9" as `0x${string}`,
+  op: "0xfef4cc60c634c0f911a11abb120503bfabf2df66" as `0x${string}`,
+  world: "0xa919f82f753c6e63ae1644f8d225c781e5287676" as `0x${string}`,
+} as const;
 
 // Legacy: Default to Base for backward compatibility
-export const GAS_FOUNDATION_CONTRACT_ADDRESS =
-  GAS_FOUNDATION_CONTRACT_ADDRESSES.base;
+export const GAS_FOUNDATION_CONTRACT_ADDRESS = GAS_FOUNDATION_CONTRACT_ADDRESSES.base;
 
 // Helper to get contract address for a chain
-export const getContractAddress = (
-  chainId: string
-): `0x${string}` | undefined => {
+export const getContractAddress = (chainId: string): `0x${string}` | undefined => {
   return GAS_FOUNDATION_CONTRACT_ADDRESSES[chainId];
 };
 

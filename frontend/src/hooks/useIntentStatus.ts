@@ -42,6 +42,23 @@ export function useIntentStatus({
       try {
         const response = await fetchIntentStatus(intentId);
         setData(response);
+        // Stop polling only when everything is terminal:
+        // - global COMPLETED/DISPERSED, or
+        // - all chainStatuses are terminal (CONFIRMED or FAILED)
+        const chainStatuses = response.intent?.chainStatuses ?? [];
+        const hasChains = chainStatuses.length > 0;
+        const allChainsTerminal = hasChains
+          ? chainStatuses.every((c) => c.status === "CONFIRMED" || c.status === "FAILED")
+          : false;
+
+        const terminal =
+          response.intent?.globalPhase === "COMPLETED" ||
+          response.intent?.status === "DISPERSED" ||
+          allChainsTerminal;
+        if (terminal && intervalRef.current) {
+          clearInterval(intervalRef.current);
+          intervalRef.current = null;
+        }
       } catch (err) {
         setError(err instanceof Error ? err : new Error("Unknown error"));
       } finally {
