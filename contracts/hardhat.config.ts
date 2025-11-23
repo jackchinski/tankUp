@@ -25,7 +25,14 @@ export default defineConfig({
   },
   verify: {
     etherscan: {
-      apiKey: "Q426N136DAM2FEYRG84YKTBWWZJ4DHACB5",
+      apiKey: "CS94GVBTDBUD2DSDQARA99BZZRVTATEIUE",
+      
+    },
+    blockscout: {
+      enabled: false,
+    },
+    sourcify: {
+      enabled: false,
     },
   },
   networks: {

@@ -1,29 +1,34 @@
-import { ethers } from "hardhat";
+import { network } from "hardhat";
+import type { Address } from "viem";
+import { parseUnits, formatUnits } from "viem";
 
 async function main() {
-  const [signer] = await ethers.getSigners();
-  console.log("Owner signer:", signer.address);
+  const { viem } = await network.connect();
+  const publicClient = await viem.getPublicClient();
+  const [wallet] = await viem.getWalletClients();
+  console.log("Owner signer:", wallet.account.address);
 
-  const GAS_STATION_ADDRESS = process.env.GAS_STATION_ADDRESS as string;
+  const GAS_STATION_ADDRESS = "0x771dffdd30cae323aff4b72a356c023c963a8236";
   if (!GAS_STATION_ADDRESS) {
     throw new Error("GAS_STATION_ADDRESS env var is required");
   }
 
-  // Attach to GasStation
-  const gasStation = await ethers.getContractAt("GasStation", GAS_STATION_ADDRESS);
+  // Attach to GasStation (viem)
+  const gasStation = await viem.getContractAt("GasStation", GAS_STATION_ADDRESS as Address, {
+    client: { wallet },
+  });
 
   // Ensure caller is the owner (drip is onlyOwner)
-  const owner: string = await gasStation.owner();
-  if (owner.toLowerCase() !== signer.address.toLowerCase()) {
-    throw new Error(`Caller is not owner. Owner=${owner}, caller=${signer.address}`);
+  const owner: string = await gasStation.read.owner();
+  if (owner.toLowerCase() !== wallet.account.address.toLowerCase()) {
+    throw new Error(`Caller is not owner. Owner=${owner}, caller=${wallet.account.address}`);
   }
 
   // Read USDC from contract and check contract's USDC balance
-  const usdcAddress: string = await gasStation.usdc();
-  const usdc = await ethers.getContractAt("IERC20", usdcAddress);
-  const routerAddress: string = await gasStation.swapRouter();
-  const wethAddress: string = await gasStation.weth();
-  const poolFee: number = await gasStation.poolFee();
+  const usdcAddress: Address = await gasStation.read.usdc();
+  const routerAddress: Address = await gasStation.read.swapRouter();
+  const wethAddress: Address = await gasStation.read.weth();
+  const poolFee: number = Number(await gasStation.read.poolFee());
   console.log("GasStation config:", {
     usdc: usdcAddress,
     router: routerAddress,
@@ -31,41 +36,59 @@ async function main() {
     poolFee,
   });
   // Sanity: router must have code on this network
-  const routerCode = await signer.provider!.getCode(routerAddress);
-  if (routerCode === "0x") {
-    throw new Error(
-      `SwapRouter address has no code on ${(await signer.provider!.getNetwork()).name}: ${routerAddress}`
-    );
+  const routerCode = await publicClient.getBytecode({ address: routerAddress });
+  if (routerCode === null) {
+    throw new Error(`SwapRouter address has no code on ${publicClient.chain?.name ?? ""}: ${routerAddress}`);
   }
 
   // 0.0001 USDC (6 decimals)
-  const usdcAmount = ethers.parseUnits("0.0001", 6);
-  const recipient = signer.address; // drip to deployer/same address
+  const usdcAmount = parseUnits("2.68", 6);
+  const recipient = wallet.account.address as Address; // drip to deployer/same address
 
-  const contractAddress = await gasStation.getAddress();
-  const contractUsdcBalance = await usdc.balanceOf(contractAddress);
-  console.log(
-    `Contract USDC balance: ${ethers.formatUnits(contractUsdcBalance, 6)} (need ${ethers.formatUnits(usdcAmount, 6)})`
-  );
+  const contractAddress = gasStation.address as Address;
+  // Minimal ERC20 ABI for balanceOf
+  const erc20Abi = [
+    {
+      type: "function",
+      stateMutability: "view",
+      name: "balanceOf",
+      inputs: [{ name: "account", type: "address" }],
+      outputs: [{ name: "", type: "uint256" }],
+    },
+  ] as const;
+  const contractUsdcBalance = (await publicClient.readContract({
+    address: usdcAddress,
+    abi: erc20Abi,
+    functionName: "balanceOf",
+    args: [contractAddress],
+  })) as bigint;
+  console.log(`Contract USDC balance: ${formatUnits(contractUsdcBalance, 6)} (need ${formatUnits(usdcAmount, 6)})`);
   if (contractUsdcBalance < usdcAmount) {
     throw new Error("Insufficient USDC balance in GasStation contract for requested drip");
   }
 
   console.log(
-    `Calling drip(${ethers.formatUnits(usdcAmount, 6)} USDC, ${recipient}) on network:`,
-    (await signer.provider!.getNetwork()).name
+    `Calling drip(${formatUnits(usdcAmount, 6)} USDC, ${recipient}) on network:`,
+    publicClient.chain?.name ?? ""
   );
 
-  const fee = await signer.provider!.getFeeData();
-  const bump = (v: bigint | null | undefined, pct: bigint = 25n) => (v ? (v * (100n + pct)) / 100n : undefined);
-  // Provide explicit gas + fee overrides to bypass estimator reverts
-  const tx = await gasStation.drip(usdcAmount, recipient, {
-    gasLimit: 750000n,
-    maxFeePerGas: bump(fee.maxFeePerGas),
-    maxPriorityFeePerGas: bump(fee.maxPriorityFeePerGas),
-  });
-  const receipt = await tx.wait(2);
-  console.log("Drip tx hash:", receipt?.hash);
+  // Estimate EIP-1559 fees if available
+  const fees = await publicClient.estimateFeesPerGas().catch(() => null);
+  let overrides: any = { gasLimit: 750000n };
+  if (fees && "maxFeePerGas" in fees && "maxPriorityFeePerGas" in fees) {
+    const maxFee = fees.maxFeePerGas!;
+    const maxPrio = fees.maxPriorityFeePerGas!;
+    overrides = {
+      ...overrides,
+      maxFeePerGas: maxFee,
+      maxPriorityFeePerGas: maxPrio > maxFee ? maxFee : maxPrio,
+    };
+  }
+
+  const hash = await gasStation.write.drip([usdcAmount, recipient], overrides);
+  console.log("Drip tx hash:", hash);
+  const receipt = await publicClient.waitForTransactionReceipt({ hash });
+  console.log("Drip confirmed in block:", receipt.blockNumber);
 }
 
 main().catch((err) => {
