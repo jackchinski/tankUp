@@ -8,20 +8,26 @@ async function main() {
   const [wallet] = await viem.getWalletClients();
   console.log("Owner signer:", wallet.account.address);
 
-  const GAS_STATION_ADDRESS = "0x771dffdd30cae323aff4b72a356c023c963a8236";
+  const GAS_STATION_ADDRESS = "0x839eaf1fe9fc3d46309893f5ec4c2c289783f991";
   if (!GAS_STATION_ADDRESS) {
     throw new Error("GAS_STATION_ADDRESS env var is required");
   }
 
   // Attach to GasStation (viem)
-  const gasStation = await viem.getContractAt("GasStation", GAS_STATION_ADDRESS as Address, {
-    client: { wallet },
-  });
+  const gasStation = await viem.getContractAt(
+    "GasStation",
+    GAS_STATION_ADDRESS as Address,
+    {
+      client: { wallet },
+    }
+  );
 
   // Ensure caller is the owner (drip is onlyOwner)
   const owner: string = await gasStation.read.owner();
   if (owner.toLowerCase() !== wallet.account.address.toLowerCase()) {
-    throw new Error(`Caller is not owner. Owner=${owner}, caller=${wallet.account.address}`);
+    throw new Error(
+      `Caller is not owner. Owner=${owner}, caller=${wallet.account.address}`
+    );
   }
 
   // Read USDC from contract and check contract's USDC balance
@@ -38,7 +44,11 @@ async function main() {
   // Sanity: router must have code on this network
   const routerCode = await publicClient.getBytecode({ address: routerAddress });
   if (routerCode === null) {
-    throw new Error(`SwapRouter address has no code on ${publicClient.chain?.name ?? ""}: ${routerAddress}`);
+    throw new Error(
+      `SwapRouter address has no code on ${
+        publicClient.chain?.name ?? ""
+      }: ${routerAddress}`
+    );
   }
 
   // 0.0001 USDC (6 decimals)
@@ -62,13 +72,23 @@ async function main() {
     functionName: "balanceOf",
     args: [contractAddress],
   })) as bigint;
-  console.log(`Contract USDC balance: ${formatUnits(contractUsdcBalance, 6)} (need ${formatUnits(usdcAmount, 6)})`);
+  console.log(
+    `Contract USDC balance: ${formatUnits(
+      contractUsdcBalance,
+      6
+    )} (need ${formatUnits(usdcAmount, 6)})`
+  );
   if (contractUsdcBalance < usdcAmount) {
-    throw new Error("Insufficient USDC balance in GasStation contract for requested drip");
+    throw new Error(
+      "Insufficient USDC balance in GasStation contract for requested drip"
+    );
   }
 
   console.log(
-    `Calling drip(${formatUnits(usdcAmount, 6)} USDC, ${recipient}) on network:`,
+    `Calling drip(${formatUnits(
+      usdcAmount,
+      6
+    )} USDC, ${recipient}) on network:`,
     publicClient.chain?.name ?? ""
   );
 

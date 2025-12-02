@@ -25,8 +25,7 @@ export default defineConfig({
   },
   verify: {
     etherscan: {
-      apiKey: "CS94GVBTDBUD2DSDQARA99BZZRVTATEIUE",
-      
+      apiKey: "P3F9SBASS1JZE3PMG4HSC9DD2KVDBUAXKN",
     },
     blockscout: {
       enabled: false,
@@ -47,7 +46,7 @@ export default defineConfig({
     base: {
       type: "http",
       chainType: "l1",
-      url: configVariable("BASE_RPC_URL"),
+      url: "https://base.rpc.subquery.network/public",
       accounts: [configVariable("PRIVATE_KEY")],
     },
     arbitrum: {

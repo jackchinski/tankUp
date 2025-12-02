@@ -1,7 +1,7 @@
 import "dotenv/config";
 import { ethers } from "ethers";
 
-const CONTRACT_ADDRESS = "0x771DffdD30Cae323afF4b72a356C023c963A8236";
+const CONTRACT_ADDRESS = "0x839eaf1fe9fc3d46309893f5ec4c2c289783f991";
 const ABI = [
   "event Deposited(address indexed user, uint256 totalAmount, uint256[] chainIds, uint256[] chainAmounts)",
   "function usdc() view returns (address)",
@@ -72,7 +72,10 @@ function logDepositedEvent(
 }
 
 function getLogKey(
-  from: ethers.EventLog | ethers.Log | { transactionHash?: string; index?: number; logIndex?: number }
+  from:
+    | ethers.EventLog
+    | ethers.Log
+    | { transactionHash?: string; index?: number; logIndex?: number }
 ): string | undefined {
   const txHash = (from as any).transactionHash as string | undefined;
   const index = (from as any).index ?? (from as any).logIndex;
@@ -91,11 +94,17 @@ function formatUnitsDecimal(big: bigint, decimals: number): string {
   if (fraction === 0n) {
     return `${negative}${whole.toString()}`;
   }
-  const fracStr = fraction.toString().padStart(decimals, "0").replace(/0+$/, "");
+  const fracStr = fraction
+    .toString()
+    .padStart(decimals, "0")
+    .replace(/0+$/, "");
   return `${negative}${whole.toString()}.${fracStr}`;
 }
 
-async function postDepositEvent(url: string, payload: DepositEventPayload): Promise<void> {
+async function postDepositEvent(
+  url: string,
+  payload: DepositEventPayload
+): Promise<void> {
   try {
     const res = await fetch(url, {
       method: "POST",
@@ -141,7 +150,9 @@ async function main(): Promise<void> {
 
   const wsUrl = process.env.BASE_WS_URL;
   const pollingIntervalMs =
-    process.env.POLLING_INTERVAL_MS !== undefined ? Number(process.env.POLLING_INTERVAL_MS) : 4000;
+    process.env.POLLING_INTERVAL_MS !== undefined
+      ? Number(process.env.POLLING_INTERVAL_MS)
+      : 4000;
   const backendUrl = process.env.BACKEND_URL || "http://localhost:3000/event";
 
   // In-memory deduplication of logs within a single process lifetime
@@ -154,7 +165,9 @@ async function main(): Promise<void> {
     const network = await wsProvider.getNetwork();
     const token: string = await contract.usdc();
 
-    console.log(`Listening (WebSocket) for Deposited on ${CONTRACT_ADDRESS}...`);
+    console.log(
+      `Listening (WebSocket) for Deposited on ${CONTRACT_ADDRESS}...`
+    );
 
     contract.on(
       "Deposited",
@@ -175,17 +188,24 @@ async function main(): Promise<void> {
         logDepositedEvent({ user, totalAmount, chainIds, chainAmounts, event });
         (async () => {
           try {
-            const bn = ("blockNumber" in event ? event.blockNumber : undefined) as number | undefined;
-            const block = typeof bn === "number" ? await wsProvider.getBlock(bn) : null;
-            const allocations: DepositEventAllocationPayload[] = chainIds.map((cid, i) => ({
-              destChainId: Number(cid),
-              amountUsd: formatUnitsDecimal(chainAmounts[i] ?? 0n, 6),
-            }));
+            const bn = (
+              "blockNumber" in event ? event.blockNumber : undefined
+            ) as number | undefined;
+            const block =
+              typeof bn === "number" ? await wsProvider.getBlock(bn) : null;
+            const allocations: DepositEventAllocationPayload[] = chainIds.map(
+              (cid, i) => ({
+                destChainId: Number(cid),
+                amountUsd: formatUnitsDecimal(chainAmounts[i] ?? 0n, 6),
+              })
+            );
             console.log("Allocations", allocations);
             const payload: DepositEventPayload = {
               chainId: Number(network.chainId),
               txHash: (event as any).transactionHash,
-              logIndex: Number((event as any).index ?? (event as any).logIndex ?? 0),
+              logIndex: Number(
+                (event as any).index ?? (event as any).logIndex ?? 0
+              ),
               blockNumber: Number(bn ?? 0),
               blockTimestamp: block?.timestamp,
               eventName: "Deposited",
@@ -284,15 +304,19 @@ async function main(): Promise<void> {
             console.log("Getting block", log.blockNumber);
             const block = await httpProvider.getBlock(log.blockNumber!);
             console.log("Block", block);
-            const allocations: DepositEventAllocationPayload[] = chainIds.map((cid, i) => ({
-              destChainId: Number(cid),
-              amountUsd: formatUnitsDecimal(chainAmounts[i] ?? 0n, 6),
-            }));
+            const allocations: DepositEventAllocationPayload[] = chainIds.map(
+              (cid, i) => ({
+                destChainId: Number(cid),
+                amountUsd: formatUnitsDecimal(chainAmounts[i] ?? 0n, 6),
+              })
+            );
             console.log("Allocations", allocations);
             const payload: DepositEventPayload = {
               chainId: Number(network.chainId),
               txHash: log.transactionHash,
-              logIndex: Number((log as any).index ?? (log as any).logIndex ?? 0),
+              logIndex: Number(
+                (log as any).index ?? (log as any).logIndex ?? 0
+              ),
               blockNumber: Number(log.blockNumber ?? 0),
               blockTimestamp: block?.timestamp,
               eventName: "Deposited",

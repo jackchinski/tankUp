@@ -28,7 +28,9 @@ export const CHAIN_CONFIGS: Record<number, ChainConfig> = {
     rpcUrl: process.env.OP_RPC_URL || "https://mainnet.optimism.io",
     explorerUrl: "https://optimistic.etherscan.io",
     nativeSymbol: "ETH",
-    contractAddress: process.env.CONTRACT_ADDRESS_10 || "0xfef4cc60c634c0f911a11abb120503bfabf2df66",
+    contractAddress:
+      process.env.CONTRACT_ADDRESS_10 ||
+      "0x839eaf1fe9fc3d46309893f5ec4c2c289783f991",
   },
   // Arbitrum
   42161: {
@@ -37,7 +39,9 @@ export const CHAIN_CONFIGS: Record<number, ChainConfig> = {
     rpcUrl: process.env.ARB_RPC_URL || "https://arb1.arbitrum.io/rpc",
     explorerUrl: "https://arbiscan.io",
     nativeSymbol: "ETH",
-    contractAddress: process.env.CONTRACT_ADDRESS_42161 || "0xe4dccc71893b66232892f1770ebe6ac75dba80b9",
+    contractAddress:
+      process.env.CONTRACT_ADDRESS_42161 ||
+      "0x839eaf1fe9fc3d46309893f5ec4c2c289783f991",
   },
   // Base
   8453: {
@@ -46,7 +50,9 @@ export const CHAIN_CONFIGS: Record<number, ChainConfig> = {
     rpcUrl: process.env.BASE_RPC_URL || "https://mainnet.base.org",
     explorerUrl: "https://basescan.org",
     nativeSymbol: "ETH",
-    contractAddress: process.env.CONTRACT_ADDRESS_8453 || "0x771DffdD30Cae323afF4b72a356C023c963A8236",
+    contractAddress:
+      process.env.CONTRACT_ADDRESS_8453 ||
+      "0x839eaf1fe9fc3d46309893f5ec4c2c289783f991",
   },
   // BSC
   56: {
@@ -84,10 +90,14 @@ export const CHAIN_CONFIGS: Record<number, ChainConfig> = {
   480: {
     chainId: 480,
     name: "World Chain",
-    rpcUrl: process.env.WORLD_RPC_URL || "https://worldchain-mainnet.g.alchemy.com/v2/demo",
+    rpcUrl:
+      process.env.WORLD_RPC_URL ||
+      "https://worldchain-mainnet.g.alchemy.com/v2/demo",
     explorerUrl: "https://worldscan.org",
     nativeSymbol: "ETH",
-    contractAddress: process.env.CONTRACT_ADDRESS_480 || "0xa919f82f753c6e63ae1644f8d225c781e5287676",
+    contractAddress:
+      process.env.CONTRACT_ADDRESS_480 ||
+      "0xa919f82f753c6e63ae1644f8d225c781e5287676",
   },
 };
 
